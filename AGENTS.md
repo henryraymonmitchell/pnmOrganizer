@@ -10,6 +10,7 @@
 
 - Install dependencies with `npm install`.
 - Run the development server with `npm run dev`.
+- To open the running app in Chrome, start `npm run dev`, then navigate in Chrome to `http://localhost:3000/pnm` (or `http://localhost:3000/member`). The root URL `http://localhost:3000` redirects to `/pnm`.
 - Create a production build with `npm run build`.
 - The project uses strict TypeScript settings. Preserve type safety and avoid adding dependencies unless needed for the requested work.
 - Use TypeScript for all new application and backend code (`.ts` / `.tsx`); do not introduce JavaScript files for app logic. Share domain and API contract types where practical, while validating untrusted data at runtime because TypeScript types do not validate network input.
@@ -46,7 +47,30 @@ The app currently has no backend or persistence layer; dashboard records and int
 
 - Backend implementation: not started; current routes use local sample data and component state.
 - Backend provider, auth model, schema, and API contracts: undecided.
-- Next action: coordinate with Dean to capture workflow, privacy, and access requirements, and with Miles to agree on the first data contract before choosing implementation details.
+- Next action: validate the draft schema below with Dean's workflow/privacy research and agree on the PNM data contract with Miles before choosing implementation details.
+
+### Draft Relational Schema (For Discussion)
+
+Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and explicit status fields. Treat this as a starting model, not an approved migration. Normalize chapter/event data instead of duplicating it in each PNM's records.
+
+- `profiles`: one row per authenticated user; auth provider user ID, display name, phone, photo storage key, and profile completion state. Keep credentials in the auth provider, not this table. Confirm whether phone is required and how consent is captured.
+- `memberships`: user-to-chapter relationship with role (`pnm`, `member`, `chapter_admin`, `ifc_admin`) and status. Chapter-scoped member access must be enforced by server/database policy.
+- `chapters`: IFC-recognized organizations; official name, short name, branding colors, active status. Confirm authoritative source and whether chapters have a campus/organization parent.
+- `rush_cycles`: a defined recruitment period (term/year, start/end dates, status). Scope events and policies to a cycle so future rush periods do not overwrite historical data.
+- `events`: belongs to a chapter and rush cycle; title, description, start/end timestamps with timezone, location/address, capacity if applicable, status, creator, and visibility. Avoid storing formatted date strings.
+- `event_rsvps`: unique `(event_id, pnm_id)` record with RSVP status and response timestamp. If PNMs add events to a personal plan without committing, use a separate `planned_events` table or an explicit `planned` RSVP status, depending on the agreed product semantics.
+- `attendance`: event and PNM reference, check-in timestamp, method, and check-in actor/device reference. Enforce one attendance record per PNM/event unless repeat entry is a real requirement. Do not accept attendance solely from a client-submitted boolean.
+- `invitations`: chapter, PNM, rush cycle, status, created/decided timestamps, and actor. Add uniqueness and lifecycle rules only after Dean clarifies whether repeat invitations or rescinds are allowed.
+- `shortlists`: member-to-PNM relationship scoped to a chapter, with created-by and optional private notes only if policy allows. Determine visibility and retention before storing evaluations or sensitive notes.
+- `audit_events` (as needed): actor, action, target, timestamp, and minimal metadata for sensitive operations such as invitation decisions or attendance correction. Define retention and access before collecting broad logs.
+
+#### Relationships and Constraints to Validate
+
+- A PNM may interact with multiple chapters during one rush cycle; a chapter owns its events and invitations.
+- A user can have different roles in different chapter/cycle contexts; avoid a single global `role` field as the only authorization source.
+- Decide whether PNM profile identity is global across cycles or whether cycle-specific registration/consent belongs in a `rush_registrations` table.
+- Confirm whether RSVP and “add to my schedule” mean the same action. The current portal only stores selected event IDs in client state, and its copy distinguishes planning from attendance.
+- Specify policies for phone/photo access, invitation privacy, shortlist visibility, data deletion/retention, consent, and attendance correction before enabling real data.
 
 ## Change Workflow
 

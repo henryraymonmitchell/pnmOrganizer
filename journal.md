@@ -17,3 +17,10 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — TypeScript decision
 - Confirmed TypeScript as the project language for frontend and backend code, consistent with the existing `.ts` / `.tsx` app and strict `tsconfig.json` settings.
 - Added guidance to share types where practical and validate untrusted runtime data at system boundaries.
+
+## 2026-11-14 — Local browser instructions
+- Added instructions for running the app and opening the PNM or member route in Chrome.
+
+## 2026-11-14 — Draft database schema
+- Added a discussion draft for relational tables and relationships covering profiles, chapter memberships, chapters, rush cycles, events, RSVPs/plans, attendance, invitations, shortlists, and audit events.
+- Captured unresolved product and privacy decisions to validate with research before implementing migrations or policies.
