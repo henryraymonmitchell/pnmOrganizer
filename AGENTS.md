@@ -46,8 +46,10 @@ The app currently has no backend or persistence layer; dashboard records and int
 ### Current Backend Status
 
 - Backend implementation: not started; current routes use local sample data and component state.
-- Backend provider, auth model, schema, and API contracts: undecided.
-- Next action: validate the draft schema below with Dean's workflow/privacy research and agree on the PNM data contract with Miles before choosing implementation details.
+- Backend provider: Supabase (Postgres, Auth, and Storage as needed).
+- Auth model, schema details, and API contracts: still to be defined with research and frontend input.
+- Use Supabase CLI local development and commit SQL migrations under `supabase/migrations`; do not make untracked production schema edits in the dashboard. Keep local/dev/staging/production environments and secrets separate.
+- Next action: validate the draft schema below with Dean's workflow/privacy research and agree on the PNM data contract with Miles, then initialize the local Supabase project and capture the first migration.
 
 ### Draft Relational Schema (For Discussion)
 

@@ -24,3 +24,7 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — Draft database schema
 - Added a discussion draft for relational tables and relationships covering profiles, chapter memberships, chapters, rush cycles, events, RSVPs/plans, attendance, invitations, shortlists, and audit events.
 - Captured unresolved product and privacy decisions to validate with research before implementing migrations or policies.
+
+## 2026-11-14 — Supabase platform decision
+- Selected Supabase as the backend platform, using managed Postgres with Auth and Storage as needed.
+- Established local Supabase development and versioned SQL migrations as the intended workflow; schema details and access policies remain to be designed.
