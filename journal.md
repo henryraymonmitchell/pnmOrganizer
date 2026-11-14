@@ -28,3 +28,8 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — Supabase platform decision
 - Selected Supabase as the backend platform, using managed Postgres with Auth and Storage as needed.
 - Established local Supabase development and versioned SQL migrations as the intended workflow; schema details and access policies remain to be designed.
+
+## 2026-11-14 — Initial SQL schema
+- Added the first Supabase Postgres migration for profiles, chapters, rush cycles, memberships, registrations/consent, events, plans, RSVPs, attendance, invitations, and shortlists.
+- Added core constraints, indexes, status enums, and update timestamps. Row-level security policies and application integration remain pending requirements review.
+- Updated the profile table so `full_name`, `phone`, and `photo_path` are required; hometown and major remain optional.

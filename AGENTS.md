@@ -32,10 +32,10 @@
 
 ## Henry's Backend Work Plan
 
-The app currently has no backend or persistence layer; dashboard records and interactions are hard-coded in `app/pnm/page.tsx` and `app/member/page.tsx`. Work in this order, updating status here as decisions are made and tasks are completed:
+The app currently has no connected backend; records and interactions are still hard-coded or held in client state in `app/pnm/page.tsx` and `app/member/page.tsx`. Supabase has been selected. Work in this order, updating status here as decisions are made and tasks are completed:
 
 1. **Confirm requirements and constraints.** Use Dean's research to define the rush lifecycle, entities, user types, privacy/consent needs, and who can see or change each record. Record open questions instead of baking guesses into the schema.
-2. **Choose backend architecture.** Compare a managed Postgres/auth service (the README currently names Supabase as a possible future integration) with the deployment needs and team familiarity. Decide environment strategy, migration approach, and local development workflow before adding secrets or production data.
+2. **Set up Supabase workflow.** Use the Supabase CLI local stack and versioned SQL migrations. Keep environment strategy and secrets separate before connecting production data.
 3. **Define domain model and access rules.** Draft the model for users, chapters, events, invitations, RSVPs, attendance/check-ins, and member shortlists. Define role and chapter boundaries, validation, retention, and audit needs with research input.
 4. **Publish integration contracts.** Specify read/write operations and TypeScript shapes for PNM dashboard, event RSVP, member attendee list, invitation review, and check-in. Agree these with Miles before implementing UI-dependent endpoints.
 5. **Implement the smallest vertical slice.** Start with safe configuration and schema/migrations, then a read path for events/invitations and an RSVP write path. Replace sample records only once the contract is agreed; keep a documented demo/seed path for local UI work.
@@ -45,17 +45,17 @@ The app currently has no backend or persistence layer; dashboard records and int
 
 ### Current Backend Status
 
-- Backend implementation: not started; current routes use local sample data and component state.
-- Backend provider: Supabase (Postgres, Auth, and Storage as needed).
+- Backend implementation: initial schema migration drafted at `supabase/migrations/202611140001_initial_schema.sql`; app routes are not connected yet.
+- Backend provider: Supabase (Postgres; Auth and Storage as needed).
 - Auth model, schema details, and API contracts: still to be defined with research and frontend input.
 - Use Supabase CLI local development and commit SQL migrations under `supabase/migrations`; do not make untracked production schema edits in the dashboard. Keep local/dev/staging/production environments and secrets separate.
-- Next action: validate the draft schema below with Dean's workflow/privacy research and agree on the PNM data contract with Miles, then initialize the local Supabase project and capture the first migration.
+- Next action: review and validate the schema with Dean's workflow/privacy research and agree on the PNM data contract with Miles; then set up the Supabase CLI project, local config, and access policies before connecting the app.
 
 ### Draft Relational Schema (For Discussion)
 
 Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and explicit status fields. Treat this as a starting model, not an approved migration. Normalize chapter/event data instead of duplicating it in each PNM's records.
 
-- `profiles`: one row per authenticated user; auth provider user ID, display name, phone, photo storage key, and profile completion state. Keep credentials in the auth provider, not this table. Confirm whether phone is required and how consent is captured.
+- `profiles`: one row per authenticated user; auth provider user ID, full name, phone, photo storage key, hometown, and major. Name, phone, and photo are required; hometown and major are optional. Store phones as text in normalized international format (for example `+13428765643`) and photos as Supabase Storage object paths, not local filesystem paths. Keep credentials in the auth provider, not this table.
 - `memberships`: user-to-chapter relationship with role (`pnm`, `member`, `chapter_admin`, `ifc_admin`) and status. Chapter-scoped member access must be enforced by server/database policy.
 - `chapters`: IFC-recognized organizations; official name, short name, branding colors, active status. Confirm authoritative source and whether chapters have a campus/organization parent.
 - `rush_cycles`: a defined recruitment period (term/year, start/end dates, status). Scope events and policies to a cycle so future rush periods do not overwrite historical data.
