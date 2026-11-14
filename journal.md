@@ -8,3 +8,8 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — Repository guidance
 - Added `AGENTS.md` with project context, development commands, and working conventions.
 - Established that `AGENTS.md` stays current as the project evolves and `journal.md` records meaningful completed milestones.
+
+## 2026-11-14 — Team ownership and backend roadmap
+- Documented Henry's backend ownership, Miles's frontend ownership, and Dean's research/outreach ownership in `AGENTS.md`.
+- Added a sequenced backend plan covering requirements, architecture, data/access rules, API contracts, vertical slice, auth, operational flows, and handoff.
+- Recorded the current state: no backend is implemented, and provider, schema, auth, and API contracts remain undecided.
