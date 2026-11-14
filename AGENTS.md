@@ -56,7 +56,7 @@ The app currently has no connected backend; records and interactions are still h
 Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and explicit status fields. Treat this as a starting model, not an approved migration. Normalize chapter/event data instead of duplicating it in each PNM's records.
 
 - `profiles`: one row per authenticated user; auth provider user ID, full name, phone, photo storage key, hometown, and major. Name, phone, and photo are required; hometown and major are optional. Store phones as text in normalized international format (for example `+13428765643`) and photos as Supabase Storage object paths, not local filesystem paths. Keep credentials in the auth provider, not this table.
-- `memberships`: user-to-chapter relationship with role (`pnm`, `member`, `chapter_admin`, `ifc_admin`) and status. Chapter-scoped member access must be enforced by server/database policy.
+- `chapter_memberships`: user-to-chapter relationship with role (`pnm`, `member`, `chapter_admin`, `ifc_admin`) and status. For PNMs, rows represent the houses they associate with; IFC Admin access across all chapters is handled by role/policy rather than duplicating a row per house. Chapter-scoped access must be enforced by server/database policy.
 - `chapters`: IFC-recognized organizations; official name, short name, branding colors, active status. Confirm authoritative source and whether chapters have a campus/organization parent.
 - `rush_cycles`: a defined recruitment period (term/year, start/end dates, status). Scope events and policies to a cycle so future rush periods do not overwrite historical data.
 - `events`: belongs to a chapter and rush cycle; title, description, start/end timestamps with timezone, location/address, capacity if applicable, status, creator, and visibility. Avoid storing formatted date strings.
@@ -70,7 +70,9 @@ Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and
 
 - A PNM may interact with multiple chapters during one rush cycle; a chapter owns its events and invitations.
 - A user can have different roles in different chapter/cycle contexts; avoid a single global `role` field as the only authorization source.
-- Decide whether PNM profile identity is global across cycles or whether cycle-specific registration/consent belongs in a `rush_registrations` table.
+- `rush_registrations` stores cycle-specific PNM registration and phone consent. `pnm_chapter_progress` stores that PNM's current round with each chapter in the cycle, using `open_invite`, `closed_invite_d1`, `closed_invite_d2`, `closed_invite_d3`, or `bid_night`. Its `(rush_cycle_id, chapter_id, pnm_id)` uniqueness allows different progress per chapter. Round changes must be restricted to authorized chapter/rush chairs and recorded with the updating actor.
+- `profiles` includes optional `hometown` and `major`. `rush_cycle_settings.funny_question_prompt` stores the cycle's rush-chair-configured optional question; `rush_registrations.funny_question_answer` stores each PNM's optional response.
+- Decide whether PNM profile identity is global across cycles or whether additional cycle-specific profile data belongs in `rush_registrations`.
 - Confirm whether RSVP and “add to my schedule” mean the same action. The current portal only stores selected event IDs in client state, and its copy distinguishes planning from attendance.
 - Specify policies for phone/photo access, invitation privacy, shortlist visibility, data deletion/retention, consent, and attendance correction before enabling real data.
 

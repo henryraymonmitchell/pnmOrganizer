@@ -9,10 +9,13 @@ create type public.event_status as enum ('draft', 'published', 'cancelled', 'com
 create type public.rsvp_status as enum ('yes', 'no', 'maybe', 'cancelled');
 create type public.attendance_method as enum ('nfc', 'qr', 'manual');
 create type public.invitation_status as enum ('pending', 'sent', 'accepted', 'declined', 'rescinded');
+create type public.pnm_round_status as enum ('open_invite', 'closed_invite_d1', 'closed_invite_d2', 'closed_invite_d3', 'bid_night');
 
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null check (char_length(trim(full_name)) between 2 and 120),
+  hometown text,
+  major text,
   phone text not null,
   photo_path text not null,
   created_at timestamptz not null default now(),
@@ -63,9 +66,30 @@ create table public.rush_registrations (
   pnm_id uuid not null references public.profiles (id) on delete cascade,
   phone_consent_at timestamptz,
   phone_consent_text_version text,
+  funny_question_answer text,
   registered_at timestamptz not null default now(),
   constraint rush_registration_unique unique (rush_cycle_id, pnm_id),
   constraint consent_version_requires_consent check (phone_consent_text_version is null or phone_consent_at is not null)
+);
+
+create table public.rush_cycle_settings (
+  rush_cycle_id uuid primary key references public.rush_cycles (id) on delete cascade,
+  funny_question_prompt text,
+  updated_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.pnm_chapter_progress (
+  id uuid primary key default gen_random_uuid(),
+  rush_cycle_id uuid not null references public.rush_cycles (id) on delete restrict,
+  chapter_id uuid not null references public.chapters (id) on delete restrict,
+  pnm_id uuid not null references public.profiles (id) on delete cascade,
+  round_status public.pnm_round_status not null default 'open_invite',
+  updated_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint pnm_chapter_progress_unique unique (rush_cycle_id, chapter_id, pnm_id)
 );
 
 create table public.events (
@@ -141,6 +165,8 @@ create table public.shortlists (
 create index chapter_memberships_user_idx on public.chapter_memberships (user_id);
 create index chapter_memberships_chapter_idx on public.chapter_memberships (chapter_id);
 create index rush_registrations_pnm_idx on public.rush_registrations (pnm_id);
+create index pnm_chapter_progress_lookup_idx on public.pnm_chapter_progress (rush_cycle_id, chapter_id, round_status);
+create index pnm_chapter_progress_pnm_idx on public.pnm_chapter_progress (pnm_id, rush_cycle_id);
 create index events_cycle_start_idx on public.events (rush_cycle_id, starts_at);
 create index events_chapter_start_idx on public.events (chapter_id, starts_at);
 create index event_plans_pnm_idx on public.event_plans (pnm_id, created_at desc);
@@ -165,7 +191,11 @@ create trigger chapters_set_updated_at before update on public.chapters
 for each row execute function public.set_updated_at();
 create trigger rush_cycles_set_updated_at before update on public.rush_cycles
 for each row execute function public.set_updated_at();
+create trigger rush_cycle_settings_set_updated_at before update on public.rush_cycle_settings
+for each row execute function public.set_updated_at();
 create trigger chapter_memberships_set_updated_at before update on public.chapter_memberships
+for each row execute function public.set_updated_at();
+create trigger pnm_chapter_progress_set_updated_at before update on public.pnm_chapter_progress
 for each row execute function public.set_updated_at();
 create trigger events_set_updated_at before update on public.events
 for each row execute function public.set_updated_at();

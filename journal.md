@@ -33,3 +33,5 @@ we'll update this journal every time we make a milestone or do something
 - Added the first Supabase Postgres migration for profiles, chapters, rush cycles, memberships, registrations/consent, events, plans, RSVPs, attendance, invitations, and shortlists.
 - Added core constraints, indexes, status enums, and update timestamps. Row-level security policies and application integration remain pending requirements review.
 - Updated the profile table so `full_name`, `phone`, and `photo_path` are required; hometown and major remain optional.
+- Added chapter-specific PNM rush-round tracking so each PNM can be at a different round with each chapter in the same cycle.
+- Added optional hometown and major profile columns, a rush-cycle question prompt, and an optional PNM answer on the cycle registration. Chapter associations are represented through `chapter_memberships`.
