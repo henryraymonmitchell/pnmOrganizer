@@ -13,3 +13,7 @@ we'll update this journal every time we make a milestone or do something
 - Documented Henry's backend ownership, Miles's frontend ownership, and Dean's research/outreach ownership in `AGENTS.md`.
 - Added a sequenced backend plan covering requirements, architecture, data/access rules, API contracts, vertical slice, auth, operational flows, and handoff.
 - Recorded the current state: no backend is implemented, and provider, schema, auth, and API contracts remain undecided.
+
+## 2026-11-14 — TypeScript decision
+- Confirmed TypeScript as the project language for frontend and backend code, consistent with the existing `.ts` / `.tsx` app and strict `tsconfig.json` settings.
+- Added guidance to share types where practical and validate untrusted runtime data at system boundaries.

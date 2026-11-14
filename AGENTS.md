@@ -12,6 +12,7 @@
 - Run the development server with `npm run dev`.
 - Create a production build with `npm run build`.
 - The project uses strict TypeScript settings. Preserve type safety and avoid adding dependencies unless needed for the requested work.
+- Use TypeScript for all new application and backend code (`.ts` / `.tsx`); do not introduce JavaScript files for app logic. Share domain and API contract types where practical, while validating untrusted data at runtime because TypeScript types do not validate network input.
 - Follow the existing app structure and visual patterns when implementing features. Keep the experience mobile-first and make interactive controls usable with keyboard and touch.
 
 ## Project Memory
