@@ -38,4 +38,11 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — Supabase app connection setup
 - Added a typed-project-ready Supabase browser client factory using the public project URL and publishable key.
 - Added `.env.example` and documented that secret/service-role keys must remain server-side.
+- Enabled RLS on all app tables and added an active-chapter read policy; private records have no client access policies yet.
+- Added idempotent seed SQL for the recognized chapter directory.
+- Applied the chapter seed in the hosted Supabase project and connected the PNM chapter directory to read active chapters with a demo fallback on load errors.
+
+## 2026-11-14 — PNM onboarding persistence
+- Added Supabase phone OTP verification to onboarding, private profile photo upload, and profile upsert/reload.
+- Added a follow-up migration with own-profile RLS policies and private Storage bucket policies. Hosted migration application and SMS provider configuration are still required before the flow can work end to end.
 - Added optional hometown and major profile columns, a rush-cycle question prompt, and an optional PNM answer on the cycle registration. Chapter associations are represented through `chapter_memberships`.

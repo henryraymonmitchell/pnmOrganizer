@@ -201,3 +201,26 @@ create trigger events_set_updated_at before update on public.events
 for each row execute function public.set_updated_at();
 create trigger invitations_set_updated_at before update on public.invitations
 for each row execute function public.set_updated_at();
+
+-- Enable RLS everywhere before exposing tables through the Supabase API.
+alter table public.profiles enable row level security;
+alter table public.chapters enable row level security;
+alter table public.rush_cycles enable row level security;
+alter table public.chapter_memberships enable row level security;
+alter table public.rush_registrations enable row level security;
+alter table public.rush_cycle_settings enable row level security;
+alter table public.pnm_chapter_progress enable row level security;
+alter table public.events enable row level security;
+alter table public.event_plans enable row level security;
+alter table public.event_rsvps enable row level security;
+alter table public.attendance enable row level security;
+alter table public.invitations enable row level security;
+alter table public.shortlists enable row level security;
+
+-- The chapter directory is public; private participant and recruitment data has no client policies yet.
+grant select on public.chapters to anon, authenticated;
+create policy "Anyone can read active chapters"
+  on public.chapters
+  for select
+  to anon, authenticated
+  using (is_active);
