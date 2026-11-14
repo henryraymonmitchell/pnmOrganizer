@@ -1,12 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import type { CSSProperties } from "react";
 
-const chapters = [
-  ["Alpha Epsilon Pi", "AΕΠ", "#174b3b", "#f4c34f"], ["Alpha Sigma Phi", "ΑΣΦ", "#214a70", "#ffffff"], ["Beta Theta Pi", "ΒΘΠ", "#8a1f2d", "#d8b55b"], ["Delta Chi", "ΔΧ", "#b12031", "#d9bd7a"], ["Delta Sigma Phi", "ΔΣΦ", "#386f94", "#ffffff"], ["Delta Upsilon", "ΔΥ", "#1d4c86", "#d1af55"], ["Kappa Sigma", "ΚΣ", "#a61d32", "#e8c55e"], ["Lambda Chi Alpha", "ΛΧΑ", "#5b265d", "#e7c96e"], ["Phi Delta Theta", "ΦΔΘ", "#29623e", "#ffffff"], ["Phi Gamma Delta", "FIJI", "#5e266c", "#ffffff"], ["Phi Kappa Psi", "ΦΚΨ", "#a82030", "#ffffff"], ["Phi Sigma Kappa", "ΦΣΚ", "#642c5c", "#e2bd61"], ["Pi Kappa Phi", "ΠΚΦ", "#cb3830", "#f3d274"], ["Sigma Nu", "ΣΝ", "#152f56", "#d0a93f"], ["Sigma Phi Epsilon", "ΣΦΕ", "#77252e", "#ffffff"], ["Sigma Pi", "ΣΠ", "#4c2764", "#e6ce67"], ["Theta Chi", "ΘΧ", "#9a2636", "#f0c754"], ["Zeta Beta Tau", "ΖΒΤ", "#235591", "#ffffff"], ["Pi Kappa Alpha", "ΠΚΑ", "#952c38", "#e8c35c"]
+type Chapter = { name: string; short: string; colors: [string, string] };
+
+const chapters: Chapter[] = [
+  { name: "Alpha Epsilon Pi", short: "AΕΠ", colors: ["#0e5b9a", "#f8c629"] }, { name: "Alpha Sigma Phi", short: "ΑΣΦ", colors: ["#cf1530", "#929ba0"] },
+  { name: "Beta Theta Pi", short: "ΒΘΠ", colors: ["#142d60", "#ffffff"] }, { name: "Delta Chi", short: "ΔΧ", colors: ["#e0062f", "#ffd34e"] },
+  { name: "Delta Sigma Phi", short: "ΔΣΦ", colors: ["#008f3b", "#ffd300"] }, { name: "Delta Upsilon", short: "ΔΥ", colors: ["#2f619b", "#ffce47"] },
+  { name: "Kappa Sigma", short: "ΚΣ", colors: ["#be0d3d", "#ffffff"] }, { name: "Lambda Chi Alpha", short: "ΛΧΑ", colors: ["#00733e", "#dca82c"] },
+  { name: "Phi Delta Theta", short: "ΦΔΘ", colors: ["#192b5f", "#d9b56d"] }, { name: "Phi Gamma Delta", short: "FIJI", colors: ["#48206f", "#ffffff"] },
+  { name: "Phi Kappa Psi", short: "ΦΚΨ", colors: ["#f2a821", "#171717"] }, { name: "Phi Sigma Kappa", short: "ΦΣΚ", colors: ["#c8143b", "#d6d6d6"] },
+  { name: "Pi Kappa Phi", short: "ΠΚΦ", colors: ["#075a9c", "#dca82c"] }, { name: "Sigma Nu", short: "ΣΝ", colors: ["#1b1a18", "#b3a073"] },
+  { name: "Sigma Phi Epsilon", short: "ΣΦΕ", colors: ["#5c2380", "#ffffff"] }, { name: "Sigma Pi", short: "ΣΠ", colors: ["#453d6b", "#ffffff"] },
+  { name: "Theta Chi", short: "ΘΧ", colors: ["#d51b2f", "#ffffff"] }, { name: "Zeta Beta Tau", short: "ΖΒΤ", colors: ["#0b3049", "#ffd000"] },
+  { name: "Pi Kappa Alpha", short: "ΠΚΑ", colors: ["#751b2a", "#d3aa68"] }
 ];
 
 export default function MemberChapterSelection() {
   const choose = (chapter: string) => window.location.assign(`/member/chair?chapter=${encodeURIComponent(chapter)}`);
-  return <main className="cal-poly-app chapter-picker"><section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER SETUP</p></section><section className="chapter-picker-body"><p className="eyebrow">CHAPTER SELECTION</p><h1>Which chapter<br />are you in?</h1><p>Select your chapter so we can prepare the right member workspace and send your profile to the correct rush chair.</p><section className="chapter-grid member-chapter-grid">{chapters.map(([name, mark, background, color]) => <button key={name} onClick={() => choose(name)}><span className="chapter-monogram" style={{ background, color }}>{mark}</span><strong>{name}</strong><small>Choose chapter <b>→</b></small></button>)}</section></section></main>;
+  return <main className="cal-poly-app chapter-picker">
+    <section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER SETUP</p></section>
+    <section className="chapter-picker-body member-directory-body">
+      <p className="eyebrow">CHAPTER SELECTION</p><h1>Which chapter<br />are you in?</h1>
+      <p>Select your chapter so we can prepare the right member workspace and send your profile to the correct rush chair.</p>
+      <section className="directory-note"><span>✦</span><p>Choose your chapter to continue with active-member verification.</p></section>
+      <section className="section-heading"><div><p className="eyebrow">RECOGNIZED CHAPTERS</p><h3>Find your chapter</h3></div><span className="chapter-count">{chapters.length}</span></section>
+      <section className="chapter-grid">{chapters.map((chapter) => <button className="chapter-tile chapter-letter-tile" key={chapter.name} onClick={() => choose(chapter.name)} style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as CSSProperties}><span className="tile-letters">{chapter.short}</span><strong>{chapter.name}</strong><small>Choose chapter <b>→</b></small></button>)}</section>
+    </section>
+  </main>;
 }
