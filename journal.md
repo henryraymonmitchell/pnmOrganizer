@@ -34,4 +34,8 @@ we'll update this journal every time we make a milestone or do something
 - Added core constraints, indexes, status enums, and update timestamps. Row-level security policies and application integration remain pending requirements review.
 - Updated the profile table so `full_name`, `phone`, and `photo_path` are required; hometown and major remain optional.
 - Added chapter-specific PNM rush-round tracking so each PNM can be at a different round with each chapter in the same cycle.
+
+## 2026-11-14 — Supabase app connection setup
+- Added a typed-project-ready Supabase browser client factory using the public project URL and publishable key.
+- Added `.env.example` and documented that secret/service-role keys must remain server-side.
 - Added optional hometown and major profile columns, a rush-cycle question prompt, and an optional PNM answer on the cycle registration. Chapter associations are represented through `chapter_memberships`.

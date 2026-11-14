@@ -47,6 +47,7 @@ The app currently has no connected backend; records and interactions are still h
 
 - Backend implementation: initial schema migration drafted at `supabase/migrations/202611140001_initial_schema.sql`; app routes are not connected yet.
 - Backend provider: Supabase (Postgres; Auth and Storage as needed).
+- The Supabase JS client is configured in `lib/supabase/client.ts` and reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Copy `.env.example` to `.env.local` and fill in the Supabase project's URL and publishable key. Never put service-role or secret keys in `NEXT_PUBLIC_*` variables or browser code.
 - Auth model, schema details, and API contracts: still to be defined with research and frontend input.
 - Use Supabase CLI local development and commit SQL migrations under `supabase/migrations`; do not make untracked production schema edits in the dashboard. Keep local/dev/staging/production environments and secrets separate.
 - Next action: review and validate the schema with Dean's workflow/privacy research and agree on the PNM data contract with Miles; then set up the Supabase CLI project, local config, and access policies before connecting the app.
