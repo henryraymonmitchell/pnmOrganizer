@@ -10,6 +10,7 @@ Mobile-first recruitment hub for IFC rush. This starter experience includes:
 
 ```bash
 npm install
+npm run seed:demo (optional)
 npm run dev
 ```
 
