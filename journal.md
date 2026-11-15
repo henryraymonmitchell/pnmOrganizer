@@ -99,3 +99,8 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-15 — Invitation review list
 - Connected rush-chair invite selections to the invitation review screen, displaying selected PNM names, photos, and profile details before sending.
 - Added per-PNM removal controls so a rush chair can refine the invite list without returning to the directory.
+
+## 2026-11-15 — Persistent-host deployment preparation
+- Added a Docker production build and Railway configuration for the Next.js app.
+- Added a one-time, opt-in demo-data startup seed that preserves real data on the persistent `/app/data` volume.
+- Documented the required persistent volume and deployment settings so SQLite databases and profile photos survive redeploys.

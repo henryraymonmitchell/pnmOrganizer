@@ -30,7 +30,14 @@ See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile, even
 
 ## Deploy
 
-To deploy the UI, use a host that provides persistent writable storage for the SQLite database and profile photos, then replace the local URLs above with the deployed domain's `/pnm` and `/member` routes.
+Use a host that provides a persistent writable volume for the SQLite database and profile photos. The included `Dockerfile` and `railway.toml` are ready for Railway or another Docker host:
+
+1. Deploy the repository with the Dockerfile.
+2. Attach a persistent volume at `/app/data`.
+3. On a shareable demo deployment, set `SEED_DEMO_DATA=true` before the first start. The container loads the tracked sample PNMs once, then writes `data/.demo-seeded` so later restarts do not overwrite data.
+4. Use the host's generated HTTPS domain for `/pnm` and `/member`.
+
+Do not deploy this SQLite version to an ephemeral serverless filesystem: profile, RSVP, event, and photo data would be lost on a restart or redeploy.
 
 ## Production check
 

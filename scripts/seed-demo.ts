@@ -87,8 +87,9 @@ try {
       if (progress.changes) {
         const targetIndex = RUSH_PROGRESS_STAGES.indexOf(profile.status);
         let previousStatus: RushProgressStage | null = null;
-        for (const [index, status] of RUSH_PROGRESS_STAGES.entries()) {
+        for (let index = 0; index < RUSH_PROGRESS_STAGES.length; index += 1) {
           if (index > targetIndex) break;
+          const status = RUSH_PROGRESS_STAGES[index];
           addHistory.run(
             randomUUID(),
             activeCycle.id,

@@ -1,0 +1,8 @@
+.git
+.next
+.seed-build
+node_modules
+data
+.env
+.env.*
+npm-debug.log*
