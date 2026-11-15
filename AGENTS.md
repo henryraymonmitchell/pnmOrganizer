@@ -46,7 +46,7 @@ The prototype now persists profiles in a local SQLite database. Events, messages
 ### Current Backend Status
 
 - Profile records are stored in `data/rush.sqlite`; photos are stored under `data/profile-photos`. Both are ignored by Git. Set `SQLITE_DB_PATH` to choose another database file.
-- The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, Rush Chair and Active Member profiles require one, and PNM profiles may select any number.
+- The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, while other roles may optionally select recognized houses.
 - `GET`, `POST`, and `PATCH /api/profile` read and write the current browser profile. The `rush_profile_id` HttpOnly cookie identifies a local prototype profile; it is not authentication or authorization.
 - The rush-chair funny-question prompt is configured in `lib/profile-domain.ts`. The profile stores the user's optional answer.
 - Existing Supabase client use remains for optional phone OTP, chapter reads, and the member PNM directory. Profile persistence and photos use SQLite/local disk instead of Supabase tables and Storage.

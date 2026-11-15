@@ -23,6 +23,13 @@ const emptyForm: ProfileForm = {
   photo: null,
 };
 
+function landingPath(role: ProfileRole) {
+  if (role === "PNM") return "/pnm";
+  if (role === "Rush Chair") return "/member?chair=yes";
+  if (role === "IFC Admin") return "/member?role=IFC%20Admin";
+  return "/member?chair=no";
+}
+
 export default function ProfileSetup() {
   const router = useRouter();
   const [role, setRole] = useState<ProfileRole | null>(null);
@@ -34,6 +41,7 @@ export default function ProfileSetup() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
     const params = new URLSearchParams(window.location.search);
     const requestedRole = params.get("role");
     const selectedRole = PROFILE_ROLES.find((candidate) => candidate === requestedRole) ?? null;
@@ -47,26 +55,19 @@ export default function ProfileSetup() {
         if (!response.ok) return;
         const value: unknown = await response.json();
         if (!isProfileDto(value)) return;
-        const saved = value;
-        if (!selectedRole || saved.role !== selectedRole) return;
-        setForm({
-          fullName: saved.full_name,
-          phone: saved.phone,
-          hometown: saved.hometown ?? "",
-          major: saved.major ?? "",
-          funnyQuestionAnswer: saved.funny_question_answer ?? "",
-          photo: null,
-        });
-        setPhotoPreview(saved.photo_url ?? "");
+        if (!active) return;
+        router.replace(landingPath(value.role));
+        return;
       } catch {
-        setError("Could not load your saved profile. You can still enter your details again.");
+        if (active) setError("Could not load your saved profile. You can still enter your details again.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
     void loadProfile();
-  }, []);
+    return () => { active = false; };
+  }, [router]);
 
   const updatePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const photo = event.target.files?.[0] ?? null;
@@ -81,11 +82,6 @@ export default function ProfileSetup() {
       setError("Choose a valid profile role from the welcome page.");
       return;
     }
-    if ((role === "Rush Chair" || role === "Active Member") && !chapterNames.includes(chapter)) {
-      setError("Choose one recognized chapter before saving this profile.");
-      return;
-    }
-
     setSaving(true);
     setError("");
     const houses = role === "IFC Admin" ? chapterNames : chapter ? [chapter] : [];
@@ -118,7 +114,7 @@ export default function ProfileSetup() {
     }
   };
 
-  const associatedHouses = role === "IFC Admin" ? "All recognized houses" : chapter || "No chapter selected";
+  const associatedHouses = role === "IFC Admin" ? "All recognized houses" : chapter || "Not provided";
 
   return <main className="cal-poly-app onboarding">
     <section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section>
@@ -132,8 +128,9 @@ export default function ProfileSetup() {
         <label>Hometown <span>(optional)</span><input value={form.hometown} onChange={(event) => setForm({ ...form, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label>
         <label>Major <span>(optional)</span><input value={form.major} onChange={(event) => setForm({ ...form, major: event.target.value })} placeholder="e.g. Computer Science" /></label>
         <label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea rows={3} value={form.funnyQuestionAnswer} onChange={(event) => setForm({ ...form, funnyQuestionAnswer: event.target.value })} /></label>
-        <section className="directory-note"><strong>Associated houses</strong><p>{associatedHouses}</p></section>
-        <label className="photo-upload">{photoPreview ? <img src={photoPreview} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{photoPreview ? "Change photo" : "Add a photo (optional)"}</b></label>
+        {role !== "IFC Admin" && <label>Your chapter <span>(optional)</span><select value={chapter} onChange={(event) => setChapter(event.target.value)}><option value="">Choose later</option>{chapterNames.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>}
+        <section className="directory-note"><strong>Associated houses <span>(optional)</span></strong><p>{associatedHouses}</p></section>
+        <label className="photo-upload">{photoPreview ? <img src={photoPreview} alt="Profile preview" /> : <span>＋</span>}<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{photoPreview ? "Change photo" : "Add a photo"}</b></label>
         {error && <p role="alert">{error}</p>}
         <button className="onboarding-next" type="submit" disabled={saving}>{saving ? "Saving…" : "Save profile →"}</button>
       </form>}

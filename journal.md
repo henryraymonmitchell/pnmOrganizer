@@ -60,3 +60,9 @@ we'll update this journal every time we make a milestone or do something
 - Added profile read/create/update API routes and private local photo serving; the browser profile cookie survives sessions on the same device.
 - Connected PNM and member/admin profile setup flows to SQLite. IFC Admin profiles associate with all recognized houses; Rush Chair and Active Member profiles select one; PNM profiles may select multiple.
 - Added the configurable funny-question prompt in TypeScript and ignored the local database/photo data directory.
+
+## 2026-11-15 — Member workspace and profile refinement
+- Refined active-member navigation to focus on PNM profiles and the chapter schedule; rush-chair-only controls remain restricted to rush chairs.
+- Made the PNM directory searchable by name, major, hometown, class year, and interests, with clear and empty-result states.
+- Connected the member header logo to the PNM directory, labeled the profile control, and aligned the member profile with the PNM profile layout. Members can update major and hometown through the local profile API.
+- Confirmed profile onboarding requires name, phone number, and photo; chapter association and other details remain optional.

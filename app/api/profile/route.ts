@@ -59,9 +59,6 @@ function parseHouses(value: FormDataEntryValue | null, role: ProfileRole) {
   if (houses.some((house) => !validHouseNames.has(house))) {
     throw new ProfileValidationError("Choose houses from the recognized chapter list.");
   }
-  if ((role === "Rush Chair" || role === "Active Member") && houses.length !== 1) {
-    throw new ProfileValidationError(`${role} profiles must be associated with exactly one house.`);
-  }
   return houses;
 }
 
@@ -95,6 +92,7 @@ async function parseProfile(request: NextRequest, id: string, prior: StoredProfi
     await writeFile(join(PHOTO_DIRECTORY, fileName), Buffer.from(await photo.arrayBuffer()));
     photoPath = `data/profile-photos/${fileName}`;
   }
+  if (!photoPath) throw new ProfileValidationError("Add a profile photo.");
 
   return {
     id,

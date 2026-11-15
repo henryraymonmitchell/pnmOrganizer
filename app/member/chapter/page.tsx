@@ -1,9 +1,36 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { chapters } from "@/lib/chapters";
+import { isProfileDto, type ProfileRole } from "@/lib/profile-domain";
+
+function landingPath(role: ProfileRole) {
+  if (role === "PNM") return "/pnm";
+  if (role === "Rush Chair") return "/member?chair=yes";
+  if (role === "IFC Admin") return "/member?role=IFC%20Admin";
+  return "/member?chair=no";
+}
 
 export default function MemberChapterSelection() {
+  const router = useRouter();
+  const [checkingAccount, setCheckingAccount] = useState(true);
+  useEffect(() => {
+    let active = true;
+    async function resumeExistingAccount() {
+      try {
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        if (!response.ok) return;
+        const profile: unknown = await response.json();
+        if (isProfileDto(profile)) router.replace(landingPath(profile.role));
+      } finally {
+        if (active) setCheckingAccount(false);
+      }
+    }
+    void resumeExistingAccount();
+    return () => { active = false; };
+  }, [router]);
   const choose = (chapter: string) => {
     const role = new URLSearchParams(window.location.search).get("role");
     if (role === "Active Member" || role === "Rush Chair") {
@@ -12,6 +39,8 @@ export default function MemberChapterSelection() {
     }
     window.location.assign(`/member/chair?chapter=${encodeURIComponent(chapter)}`);
   };
+  if (checkingAccount) return <main className="cal-poly-app chapter-picker"><section className="chapter-picker-body member-directory-body"><p className="eyebrow">CAL POLY IFC</p><h1>Loading your<br />member workspace.</h1></section></main>;
+
   return <main className="cal-poly-app chapter-picker">
     <section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER SETUP</p></section>
     <section className="chapter-picker-body member-directory-body">

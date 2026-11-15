@@ -2,9 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
-import { FUNNY_QUESTION_PROMPT, isProfileDto, type ProfileDto, type ProfileRole } from "@/lib/profile-domain";
+import { isProfileDto, type ProfileDto, type ProfileRole } from "@/lib/profile-domain";
+import { chapters, type Chapter } from "@/lib/chapters";
 
 type Pnm = { id: string; name: string; major: string; year: string; hometown: string; attended: string; tags: string[]; image: string };
+type ChapterScheduleEvent = { date: string; day: string; title: string; time: string; note: string };
+
+const searchableText = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase()
+  .trim();
 
 const pnms: Pnm[] = [
   { id: "maya", name: "Maya Rodriguez", major: "Business", year: "2028", hometown: "San Diego, CA", attended: "Open House · Tonight", tags: ["Outgoing", "Leadership"], image: "" },
@@ -76,42 +84,102 @@ export default function MemberPortal() {
   }, []);
   const isRushChair = myProfile?.role === "Rush Chair" || roleSetting === "Rush Chair" || chairSetting === "yes";
   const currentRole = myProfile?.role ?? roleSetting ?? (isRushChair ? "Rush Chair" : "Active Member");
-  const filtered = useMemo(() => pnmList.filter((pnm) => `${pnm.name} ${pnm.major} ${pnm.year} ${pnm.hometown} ${pnm.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase())), [query, pnmList]);
+  const memberChapter = myProfile?.associated_houses[0]
+    ? chapters.find((chapter) => chapter.name === myProfile.associated_houses[0]) ?? null
+    : null;
+  const filtered = useMemo(() => {
+    const searchTerms = searchableText(query).split(/\s+/).filter(Boolean);
+    if (!searchTerms.length) return pnmList;
+    return pnmList.filter((pnm) => {
+      const profileText = searchableText(`${pnm.name} ${pnm.major} ${pnm.year} ${pnm.hometown} ${pnm.tags.join(" ")}`);
+      return searchTerms.every((term) => profileText.includes(term));
+    });
+  }, [query, pnmList]);
   const toggleInvite = (id: string) => setInviteList((current) => current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]);
   const addNote = (id: string, note: string) => { if (!note.trim()) return; setNotes((current) => ({ ...current, [id]: [...(current[id] || []), note.trim()] })); };
+  const saveProfileDetails = async (details: Pick<ProfileDto, "hometown" | "major">) => {
+    if (!myProfile) return false;
+    const form = new FormData();
+    form.set("role", myProfile.role);
+    form.set("full_name", myProfile.full_name);
+    form.set("phone", myProfile.phone);
+    form.set("hometown", details.hometown ?? "");
+    form.set("major", details.major ?? "");
+    form.set("funny_question_answer", myProfile.funny_question_answer ?? "");
+    form.set("associated_houses", JSON.stringify(myProfile.associated_houses));
+    try {
+      const response = await fetch("/api/profile", { method: "PATCH", body: form });
+      const result: unknown = await response.json();
+      if (!response.ok || !isProfileDto(result)) return false;
+      setMyProfile(result);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   if (approval === "pending") return <ApprovalStatus chair={chairSetting === "yes"} />;
-  return <main className="cal-poly-app member-app"><header className="cal-poly-header"><div className="brand brand-lockup"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /></div><span className="role-label">{currentRole === "IFC Admin" ? "IFC ADMIN" : isRushChair ? "RUSH CHAIR HQ" : "MEMBER HQ"}</span><button className={isRushChair ? "avatar member-avatar chair-avatar" : "avatar member-avatar"} onClick={() => setScreen("profile")} aria-label="Open profile">{myProfile?.full_name ? myProfile.full_name.slice(0, 2).toUpperCase() : isRushChair ? <img src="/brand/rush-chair.jpg" alt="Rush chair profile" /> : "JM"}</button></header>
-    {screen === "feed" && <PnmFeed isRushChair={isRushChair} query={query} setQuery={setQuery} pnms={filtered} inviteList={inviteList} toggleInvite={toggleInvite} notes={notes} addNote={addNote} messagePnm={() => setScreen("messages")} />}
-    {screen === "schedule" && <RushSchedule />}
+  return <main className="cal-poly-app member-app"><header className="cal-poly-header"><button className="brand brand-lockup home-logo" onClick={() => setScreen("feed")} aria-label="Back to PNM profiles"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /></button><span className="role-label">{currentRole === "IFC Admin" ? "IFC ADMIN" : isRushChair ? "RUSH CHAIR HQ" : "MEMBER HQ"}</span><div className="member-profile-trigger"><button className={`${isRushChair ? "avatar member-avatar chair-avatar" : "avatar member-avatar"}${myProfile?.photo_url ? " has-profile-photo" : ""}`} onClick={() => setScreen("profile")} aria-label="Open profile">{myProfile?.photo_url ? <img src={myProfile.photo_url} alt="Your profile" /> : isRushChair ? <img src="/brand/rush-chair.jpg" alt="Rush chair profile" /> : myProfile?.full_name?.slice(0, 2).toUpperCase() || "MI"}</button><span>Profile</span></div></header>
+    {screen === "feed" && <PnmFeed chapter={memberChapter} isRushChair={isRushChair} query={query} setQuery={setQuery} pnms={filtered} inviteList={inviteList} toggleInvite={toggleInvite} notes={notes} addNote={addNote} messagePnm={() => setScreen("messages")} />}
+    {screen === "schedule" && <RushSchedule chapter={memberChapter} canSchedule={isRushChair} />}
     {screen === "chair" && isRushChair && <ChairControlCenter inviteList={inviteList} goToPnms={() => setScreen("feed")} />}
-    {screen === "messages" && <ChairMessages goBack={() => setScreen(isRushChair ? "chair" : "feed")} />}
-    {screen === "profile" && <MemberProfile isRushChair={isRushChair} profile={myProfile} />}
-    {addingPnm && <AddPnm close={() => setAddingPnm(false)} add={(pnm) => { setPnmList([pnm, ...pnmList]); setAddingPnm(false); setScreen("feed"); }} />}
-    <nav className="bottom-nav member-nav"><button className={screen === "feed" ? "nav-active" : ""} onClick={() => setScreen("feed")}><span>⌂</span>PNMs</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>Schedule</button><button className="scan" aria-label="Add PNM" onClick={() => setAddingPnm(true)}><span>＋</span></button>{isRushChair ? <button className={screen === "chair" ? "nav-active" : ""} onClick={() => setScreen("chair")}><span>✦</span>Chair tools</button> : <button><span>♧</span>Reminders</button>}<button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span>✉</span>Messages</button></nav>
+    {screen === "messages" && isRushChair && <ChairMessages goBack={() => setScreen("chair")} />}
+    {screen === "profile" && <MemberProfile isRushChair={isRushChair} profile={myProfile} saveDetails={saveProfileDetails} />}
+    {addingPnm && isRushChair && <AddPnm close={() => setAddingPnm(false)} add={(pnm) => { setPnmList([pnm, ...pnmList]); setAddingPnm(false); setScreen("feed"); }} />}
+    <nav className="bottom-nav member-nav"><button className={screen === "feed" ? "nav-active" : ""} onClick={() => setScreen("feed")}><span>⌂</span>PNMs</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>Schedule</button>{isRushChair && <><button className="scan" aria-label="Add PNM" onClick={() => setAddingPnm(true)}><span>＋</span></button><button className={screen === "chair" ? "nav-active" : ""} onClick={() => setScreen("chair")}><span>✦</span>Chair tools</button><button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span>✉</span>Messages</button></>}</nav>
   </main>;
 }
 
 function ApprovalStatus({ chair }: { chair: boolean }) { const enterWorkspace = () => window.location.assign(`/member?chair=${chair ? "yes" : "no"}`); return <main className="cal-poly-app member-pending"><section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER PROFILE</p></section><section className="gateway-card"><p className="eyebrow">REQUEST SUBMITTED</p><span className="verified-mark pending">◷</span><h1>Waiting for<br />approval.</h1><p className="gateway-copy">Your active-member profile is with your chapter’s rush chair. You’ll receive member access once they confirm you.</p><section className="approval-detail"><strong>{chair ? "Rush chair profile noted" : "Active member profile noted"}</strong><span>Cal Poly email verified</span></section><section className="demo-bypass"><p>DEMO MODE</p><strong>{chair ? "Skip chair verification" : "Skip member approval"}</strong><span>For prototype review only. This will be removed when real approvals are connected.</span><button onClick={enterWorkspace}>Enter {chair ? "rush chair" : "member"} workspace →</button></section></section></main>; }
 
-function MemberProfile({ isRushChair, profile }: { isRushChair: boolean; profile: ProfileDto | null }) { return <div className="shell member-profile"><p className="eyebrow">{profile?.role.toUpperCase() ?? (isRushChair ? "RUSH CHAIR PROFILE" : "ACTIVE MEMBER PROFILE")}</p>{profile?.photo_url ? <img className="chair-profile-photo" src={profile.photo_url} alt="Profile" /> : <div className="profile-placeholder member-profile-placeholder" />}<h1>{profile?.full_name ?? (isRushChair ? "Rush chair" : "Active member")}</h1><p className="muted">{profile?.major || "Major not provided"}{profile?.hometown ? ` · ${profile.hometown}` : ""}</p>{profile && <><section className="profile-detail"><strong>Phone</strong><span>{profile.phone}</span></section><section className="profile-detail"><strong>Associated houses</strong><span>{profile.associated_houses.length ? profile.associated_houses.join(", ") : "None selected"}</span></section>{profile.funny_question_answer && <section className="profile-detail"><strong>{FUNNY_QUESTION_PROMPT}</strong><span>{profile.funny_question_answer}</span></section>}</>}</div>; }
+function MemberProfile({ isRushChair, profile, saveDetails }: { isRushChair: boolean; profile: ProfileDto | null; saveDetails: (details: Pick<ProfileDto, "hometown" | "major">) => Promise<boolean> }) {
+  const [major, setMajor] = useState(profile?.major ?? "");
+  const [hometown, setHometown] = useState(profile?.hometown ?? "");
+  const [status, setStatus] = useState("");
+  useEffect(() => {
+    setMajor(profile?.major ?? "");
+    setHometown(profile?.hometown ?? "");
+  }, [profile]);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setStatus("Saving…");
+    setStatus(await saveDetails({ major: major || null, hometown: hometown || null }) ? "Saved" : "Could not save. Please try again.");
+  };
+  const displayName = profile?.full_name ?? (isRushChair ? "Rush chair" : "Active member");
+  return <div className="shell pnm-profile member-profile"><section className="greeting"><p className="eyebrow">YOUR {profile?.role.toUpperCase() ?? (isRushChair ? "RUSH CHAIR" : "ACTIVE MEMBER")} PROFILE</p><h1>{displayName}</h1><p className="muted">Keep your details current so your chapter can recognize you.</p></section><section className="profile-summary">{profile?.photo_url ? <img src={profile.photo_url} alt={`${displayName} profile`} /> : <span>◌</span>}<div><strong>{displayName}</strong><small>{profile?.phone ?? "Phone not provided"}</small></div></section>{profile && <form className="profile-details" onSubmit={submit}><div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{status && <span role="status">{status}</span>}</div><label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label><label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label><label>Your chapter<input value={profile.associated_houses.join(", ") || "No chapter selected"} readOnly aria-label="Your chapter" /></label><button type="submit">Save details</button></form>}</div>;
+}
 
-function PnmFeed({ isRushChair, query, setQuery, pnms: visiblePnms, inviteList, toggleInvite, notes, addNote, messagePnm }: { isRushChair: boolean; query: string; setQuery: (value: string) => void; pnms: Pnm[]; inviteList: string[]; toggleInvite: (id: string) => void; notes: Record<string, string[]>; addNote: (id: string, note: string) => void; messagePnm: () => void }) { return <div className="shell member-feed"><section className="member-hero"><p className="eyebrow">DELTA TAU DELTA · RUSH</p><h1>{isRushChair ? "View your\nPNMs." : "PNM profiles."}</h1></section><section className="reminder-card"><span>◷</span><div><strong>Rush schedule reminder</strong><p>Open House begins at 7:00 PM.</p></div><button>Set</button></section><div className="feed-search discreet"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search PNMs" /></div><section className="feed-label"><div><p className="eyebrow">PNM DIRECTORY</p><h2>{visiblePnms.length} profiles</h2></div>{isRushChair && <span>{inviteList.length} selected</span>}</section><section className="pnm-feed-list">{visiblePnms.map((pnm) => <PnmCard key={pnm.id} pnm={pnm} isRushChair={isRushChair} invited={inviteList.includes(pnm.id)} toggleInvite={toggleInvite} notes={notes[pnm.id] || []} addNote={addNote} messagePnm={messagePnm} />)}</section></div>; }
+function PnmFeed({ chapter, isRushChair, query, setQuery, pnms: visiblePnms, inviteList, toggleInvite, notes, addNote, messagePnm }: { chapter: Chapter | null; isRushChair: boolean; query: string; setQuery: (value: string) => void; pnms: Pnm[]; inviteList: string[]; toggleInvite: (id: string) => void; notes: Record<string, string[]>; addNote: (id: string, note: string) => void; messagePnm: () => void }) { const chapterName = chapter?.name ?? "Your Chapter"; const hasQuery = Boolean(query.trim()); return <div className="shell member-feed"><section className="member-hero" style={chapter ? { "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties : undefined}><p className="eyebrow">{chapterName.toUpperCase()} · RUSH</p><h1>{isRushChair ? "View your\nPNMs." : "PNM profiles."}</h1></section><section className="reminder-card"><span>◷</span><div><strong>Rush schedule reminder</strong><p>Open House begins at 7:00 PM.</p></div><button>Set</button></section><div className="feed-search discreet"><span aria-hidden="true">⌕</span><label className="sr-only" htmlFor="pnm-search">Search PNMs</label><input id="pnm-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search PNMs" autoComplete="off" />{hasQuery && <button type="button" className="clear-search" onClick={() => setQuery("")} aria-label="Clear PNM search">×</button>}</div><section className="feed-label"><div><p className="eyebrow">PNM DIRECTORY</p><h2>{visiblePnms.length} {hasQuery ? "matching " : ""}profile{visiblePnms.length === 1 ? "" : "s"}</h2></div>{isRushChair && <span>{inviteList.length} selected</span>}</section><section className="pnm-feed-list">{visiblePnms.map((pnm) => <PnmCard key={pnm.id} pnm={pnm} isRushChair={isRushChair} invited={inviteList.includes(pnm.id)} toggleInvite={toggleInvite} notes={notes[pnm.id] || []} addNote={addNote} messagePnm={messagePnm} />)}{hasQuery && !visiblePnms.length && <div className="pnm-search-empty"><strong>No PNMs found</strong><span>Try a name, major, hometown, class year, or interest.</span><button type="button" onClick={() => setQuery("")}>Clear search</button></div>}</section></div>; }
 
-function PnmCard({ pnm, isRushChair, invited, toggleInvite, notes, addNote, messagePnm }: { pnm: Pnm; isRushChair: boolean; invited: boolean; toggleInvite: (id: string) => void; notes: string[]; addNote: (id: string, note: string) => void; messagePnm: () => void }) { const [draft, setDraft] = useState(""); return <article className="pnm-card compact">{pnm.image ? <img className="profile-placeholder pnm-photo" src={pnm.image} alt={`${pnm.name} profile`} /> : <div className="profile-placeholder" aria-label="Default profile photo"></div>}<div className="pnm-card-body"><h2>{pnm.name}</h2><p className="pnm-detail">{pnm.hometown}<br />{pnm.major} · {pnm.year}</p><div className="pnm-actions"><button onClick={messagePnm}>Message PNM</button>{isRushChair && <button className={invited ? "invite-toggle selected" : "invite-toggle"} onClick={() => toggleInvite(pnm.id)}>{invited ? "✓ Invite list" : "+ Invite list"}</button>}</div><section className="notes"><p>Private discussion notes <span>{notes.length}</span></p>{notes.map((note, index) => <blockquote key={`${note}-${index}`}>{note}</blockquote>)}<div><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add note for actives & chair…" onKeyDown={(event) => { if (event.key === "Enter") { addNote(pnm.id, draft); setDraft(""); } }} /><button onClick={() => { addNote(pnm.id, draft); setDraft(""); }}>Add</button></div></section></div></article>; }
+function PnmCard({ pnm, isRushChair, invited, toggleInvite, notes, addNote, messagePnm }: { pnm: Pnm; isRushChair: boolean; invited: boolean; toggleInvite: (id: string) => void; notes: string[]; addNote: (id: string, note: string) => void; messagePnm: () => void }) { const [draft, setDraft] = useState(""); return <article className="pnm-card compact">{pnm.image ? <img className="profile-placeholder pnm-photo" src={pnm.image} alt={`${pnm.name} profile`} /> : <div className="profile-placeholder" aria-label="Default profile photo"></div>}<div className="pnm-card-body"><h2>{pnm.name}</h2><p className="pnm-detail">{pnm.hometown}<br />{pnm.major} · {pnm.year}</p>{isRushChair && <div className="pnm-actions"><button onClick={messagePnm}>Message PNM</button><button className={invited ? "invite-toggle selected" : "invite-toggle"} onClick={() => toggleInvite(pnm.id)}>{invited ? "✓ Invite list" : "+ Invite list"}</button></div>}<section className="notes"><p>Private discussion notes <span>{notes.length}</span></p>{notes.map((note, index) => <blockquote key={`${note}-${index}`}>{note}</blockquote>)}<div><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add note for actives & chair…" onKeyDown={(event) => { if (event.key === "Enter") { addNote(pnm.id, draft); setDraft(""); } }} /><button onClick={() => { addNote(pnm.id, draft); setDraft(""); }}>Add</button></div></section></div></article>; }
 
-function RushSchedule() {
-  const chapter = { name: "Delta Tau Delta", short: "ΔΤΔ", colors: ["#173b72", "#f4c85b"] as [string, string] };
-  const chapterEvents = [
+function RushSchedule({ chapter: savedChapter, canSchedule }: { chapter: Chapter | null; canSchedule: boolean }) {
+  const chapter = savedChapter ?? { name: "Your Chapter", short: "IFC", colors: ["#174b3b", "#f4c34f"] as [string, string] };
+  const [chapterEvents, setChapterEvents] = useState<ChapterScheduleEvent[]>([
     { date: "SEP 12", day: "FRI", title: "Open House", time: "4:00 – 6:00 PM", note: "42 checked in" },
     { date: "SEP 12", day: "FRI", title: "Chapter Social", time: "7:00 – 9:00 PM", note: "Roster follow-up" },
     { date: "SEP 13", day: "SAT", title: "Patio Social", time: "5:30 – 7:00 PM", note: "RSVP follow-up" },
     { date: "SEP 14", day: "SUN", title: "Preference Night", time: "6:00 – 8:00 PM", note: "Set-up at 5:15" },
-  ];
+  ]);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [draft, setDraft] = useState({ title: "", date: "SEP 12", time: "", description: "" });
+  const dayForDate: Record<string, string> = { "SEP 12": "FRI", "SEP 13": "SAT", "SEP 14": "SUN" };
   const dates = Array.from(new Set(chapterEvents.map((event) => event.date)));
+  const createEvent = () => {
+    if (!draft.title.trim() || !draft.time.trim() || !draft.description.trim()) return;
+    setChapterEvents((current) => [...current, {
+      date: draft.date,
+      day: dayForDate[draft.date],
+      title: draft.title.trim(),
+      time: draft.time.trim(),
+      note: draft.description.trim(),
+    }]);
+    setDraft({ title: "", date: "SEP 12", time: "", description: "" });
+    setCreatingEvent(false);
+  };
   return <div className="shell personal-schedule rush-schedule">
-    <section className="greeting"><p className="eyebrow">DELTA TAU DELTA · RUSH WEEK</p><h1>My schedule</h1><p className="muted">Your chapter’s events and member reminders.</p></section>
-    <button className="schedule-event">＋ Schedule an event</button>
+    <section className="greeting"><p className="eyebrow">{chapter.name.toUpperCase()} · RUSH WEEK</p><h1>My schedule</h1><p className="muted">Your chapter’s events.</p></section>
+    {canSchedule && <button className="schedule-event" type="button" onClick={() => setCreatingEvent(true)}>＋ Schedule an event</button>}
     <section className="schedule-days">{dates.map((date, index) => {
       const dayEvents = chapterEvents.filter((event) => event.date === date);
       const [month, day] = date.split(" ");
@@ -122,7 +190,7 @@ function RushSchedule() {
         </article>)}</div>
       </section>;
     })}</section>
-    <section className="reminder-settings"><span>♧</span><div><strong>Member reminders</strong><p>Get notified 30 minutes before each event.</p></div><button className="toggle-on">●</button></section>
+    {canSchedule && creatingEvent && <div className="member-modal" role="dialog" aria-modal="true" aria-label="Schedule an event"><section><button className="sheet-close" type="button" onClick={() => setCreatingEvent(false)} aria-label="Close">×</button><p className="eyebrow">NEW CHAPTER EVENT</p><h2>Schedule an event</h2><p>Add the event details for {chapter.name}.</p><label>Event name<input autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="e.g. Game Night" /></label><label>Date<select value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })}><option value="SEP 12">Friday · Sep 12</option><option value="SEP 13">Saturday · Sep 13</option><option value="SEP 14">Sunday · Sep 14</option></select></label><label>Time<input value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} placeholder="e.g. 7:00 – 9:00 PM" /></label><label>Description<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="What should members know about this event?" rows={3} /></label><button className="gateway-next" type="button" disabled={!draft.title.trim() || !draft.time.trim() || !draft.description.trim()} onClick={createEvent}>Add to schedule →</button></section></div>}
   </div>;
 }
 
