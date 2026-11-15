@@ -73,3 +73,9 @@ we'll update this journal every time we make a milestone or do something
 - Connected the PNM chapter directory, schedule, member PNM directory, and event calendar to SQLite. Rush chairs can create chapter events and add PNM profiles from the member workspace; those records reload across sessions.
 - Seeded one demo open-invite event per recognized chapter for pitch/demo setup and documented that the addresses are placeholders.
 - Added a profile-switch action that clears the browser cookie while keeping each saved SQLite profile, making multi-profile pitch demos possible on one device.
+
+## 2026-11-15 — Profile and member experience refinements
+- Added logout and account-type switching that retains a saved profile and photo while allowing the user to choose a new role.
+- Simplified PNM optional profile fields by removing the house-preference and personal-question controls from onboarding and editing.
+- Added a required branded chapter-card picker for Active Member and Rush Chair profile completion.
+- Kept the SQLite-backed member directory search and private PNM photo delivery, with search and progress data reconnected to the expanded SQLite backend.

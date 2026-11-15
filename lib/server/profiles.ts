@@ -34,6 +34,25 @@ export function getProfileById(id: string): StoredProfile | null {
   return { ...row, associated_houses: houses.map((house) => house.house_name) };
 }
 
+export type PnmDirectoryProfile = Pick<ProfileRow, "id" | "full_name" | "hometown" | "major" | "photo_path">;
+
+export function searchPnmDirectory(query: string): PnmDirectoryProfile[] {
+  const database = getDatabase();
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+  const conditions = terms.map(() => "(LOWER(full_name) LIKE ? OR LOWER(COALESCE(hometown, '')) LIKE ? OR LOWER(COALESCE(major, '')) LIKE ?)");
+  const parameters = terms.flatMap((term) => {
+    const pattern = `%${term}%`;
+    return [pattern, pattern, pattern];
+  });
+  return database.prepare(`
+    SELECT id, full_name, hometown, major, photo_path
+    FROM profiles
+    WHERE role = 'PNM' ${conditions.length ? `AND ${conditions.join(" AND ")}` : ""}
+    ORDER BY full_name COLLATE NOCASE
+    LIMIT 100
+  `).all(...parameters) as PnmDirectoryProfile[];
+}
+
 export function saveProfile(input: ProfileInput, progressActorId: string | null = null): StoredProfile {
   const database = getDatabase();
   const now = new Date().toISOString();

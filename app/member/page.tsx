@@ -38,6 +38,7 @@ export default function MemberPortal() {
   const [roleSetting, setRoleSetting] = useState<ProfileRole | null>(null);
   const [myProfile, setMyProfile] = useState<ProfileDto | null>(null);
   const [screen, setScreen] = useState<"feed" | "schedule" | "chair" | "messages" | "profile">("feed");
+  const [scheduleEventRequest, setScheduleEventRequest] = useState(0);
   const [query, setQuery] = useState("");
   const [pnmList, setPnmList] = useState<Pnm[]>([]);
   const [pnmLoadError, setPnmLoadError] = useState<string | null>(null);
@@ -163,28 +164,22 @@ export default function MemberPortal() {
       return false;
     }
   };
-  const switchProfile = async () => {
-    try {
-      await fetch("/api/profile", { method: "DELETE" });
-    } catch { /* Continue to the account gateway if the demo request fails. */ }
-    window.location.assign("/");
-  };
+  const switchProfile = () => window.location.assign("/?switch=1");
 
   if (approval === "pending") return <ApprovalStatus chair={chairSetting === "yes"} />;
   return <main className="cal-poly-app member-app"><header className="cal-poly-header"><button className="brand brand-lockup home-logo" onClick={() => setScreen("feed")} aria-label="Back to PNM profiles"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /></button><span className="role-label">{currentRole === "IFC Admin" ? "IFC ADMIN" : isRushChair ? "RUSH CHAIR HQ" : "MEMBER HQ"}</span><div className="member-profile-trigger"><button className={`${isRushChair ? "avatar member-avatar chair-avatar" : "avatar member-avatar"}${myProfile?.photo_url ? " has-profile-photo" : ""}`} onClick={() => setScreen("profile")} aria-label="Open profile">{myProfile?.photo_url ? <img src={myProfile.photo_url} alt="Your profile" /> : isRushChair ? <img src="/brand/rush-chair.jpg" alt="Rush chair profile" /> : myProfile?.full_name?.slice(0, 2).toUpperCase() || "MI"}</button><span>Profile</span></div></header>
     {screen === "feed" && <PnmFeed chapter={memberChapter} isRushChair={isRushChair} query={query} setQuery={setQuery} pnms={filtered} inviteList={inviteList} toggleInvite={toggleInvite} notes={notes} addNote={addNote} messagePnm={() => setScreen("messages")} updateProgress={updateProgress} loadError={pnmLoadError} />}
-    {screen === "schedule" && <RushSchedule chapter={memberChapter} canSchedule={isRushChair} />}
+    {screen === "schedule" && <RushSchedule chapter={memberChapter} canSchedule={isRushChair} openEventRequest={scheduleEventRequest} />}
     {screen === "chair" && isRushChair && <ChairControlCenter inviteList={inviteList} goToPnms={() => setScreen("feed")} />}
     {screen === "messages" && isRushChair && <ChairMessages goBack={() => setScreen("chair")} />}
     {screen === "profile" && <MemberProfile isRushChair={isRushChair} profile={myProfile} saveDetails={saveProfileDetails} switchProfile={switchProfile} />}
-    {addingPnm && isRushChair && <AddPnm chapterName={memberChapter?.name ?? ""} close={() => setAddingPnm(false)} add={async (details) => { const saved = await addPnm(details); if (saved) { setAddingPnm(false); setScreen("feed"); } }} />}
-    <nav className="bottom-nav member-nav"><button className={screen === "feed" ? "nav-active" : ""} onClick={() => setScreen("feed")}><span>⌂</span>PNMs</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>Schedule</button>{isRushChair && <><button className="scan" aria-label="Add PNM" onClick={() => setAddingPnm(true)}><span>＋</span></button><button className={screen === "chair" ? "nav-active" : ""} onClick={() => setScreen("chair")}><span>✦</span>Chair tools</button><button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span>✉</span>Messages</button></>}</nav>
+    <nav className="bottom-nav member-nav"><button className={screen === "feed" ? "nav-active" : ""} onClick={() => setScreen("feed")}><span>⌂</span>PNMs</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>Schedule</button>{isRushChair && <><button className="scan" aria-label="Schedule an event" onClick={() => { setScreen("schedule"); setScheduleEventRequest((current) => current + 1); }}><span>＋</span></button><button className={screen === "chair" ? "nav-active" : ""} onClick={() => setScreen("chair")}><span>✦</span>Chair tools</button><button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span className="plane-icon">➤</span>Messages</button></>}</nav>
   </main>;
 }
 
 function ApprovalStatus({ chair }: { chair: boolean }) { const enterWorkspace = () => window.location.assign(`/member?chair=${chair ? "yes" : "no"}`); return <main className="cal-poly-app member-pending"><section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER PROFILE</p></section><section className="gateway-card"><p className="eyebrow">REQUEST SUBMITTED</p><span className="verified-mark pending">◷</span><h1>Waiting for<br />approval.</h1><p className="gateway-copy">Your active-member profile is with your chapter’s rush chair. You’ll receive member access once they confirm you.</p><section className="approval-detail"><strong>{chair ? "Rush chair profile noted" : "Active member profile noted"}</strong><span>Cal Poly email verified</span></section><section className="demo-bypass"><p>DEMO MODE</p><strong>{chair ? "Skip chair verification" : "Skip member approval"}</strong><span>For prototype review only. This will be removed when real approvals are connected.</span><button onClick={enterWorkspace}>Enter {chair ? "rush chair" : "member"} workspace →</button></section></section></main>; }
 
-function MemberProfile({ isRushChair, profile, saveDetails, switchProfile }: { isRushChair: boolean; profile: ProfileDto | null; saveDetails: (details: Pick<ProfileDto, "hometown" | "major"> & { associated_houses?: string[] }) => Promise<boolean>; switchProfile: () => Promise<void> }) {
+function MemberProfile({ isRushChair, profile, saveDetails, switchProfile }: { isRushChair: boolean; profile: ProfileDto | null; saveDetails: (details: Pick<ProfileDto, "hometown" | "major"> & { associated_houses?: string[] }) => Promise<boolean>; switchProfile: () => void }) {
   const [major, setMajor] = useState(profile?.major ?? "");
   const [hometown, setHometown] = useState(profile?.hometown ?? "");
   const [chapter, setChapter] = useState(profile?.associated_houses[0] ?? "");
@@ -201,7 +196,7 @@ function MemberProfile({ isRushChair, profile, saveDetails, switchProfile }: { i
     setStatus(await saveDetails({ major: major || null, hometown: hometown || null, associated_houses: associatedHouses }) ? "Saved" : "Could not save. Please try again.");
   };
   const displayName = profile?.full_name ?? (isRushChair ? "Rush chair" : "Active member");
-  return <div className="shell pnm-profile member-profile"><section className="greeting"><p className="eyebrow">YOUR {profile?.role.toUpperCase() ?? (isRushChair ? "RUSH CHAIR" : "ACTIVE MEMBER")} PROFILE</p><h1>{displayName}</h1><p className="muted">Keep your details current so your chapter can recognize you.</p></section><section className="profile-summary">{profile?.photo_url ? <img src={profile.photo_url} alt={`${displayName} profile`} /> : <span>◌</span>}<div><strong>{displayName}</strong><small>{profile?.phone ?? "Phone not provided"}</small></div></section>{profile && <form className="profile-details" onSubmit={submit}><div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{status && <span role="status">{status}</span>}</div><label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label><label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label>{profile.role === "IFC Admin" ? <label>Your chapter<input value="All recognized houses" readOnly /></label> : <label>Your chapter<select required value={chapter} onChange={(event) => setChapter(event.target.value)}><option value="">Choose your chapter</option>{chapters.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label>}<button type="submit">Save details</button></form>}<button className="schedule-event" type="button" onClick={() => void switchProfile()}>Switch profile</button></div>;
+  return <div className="shell pnm-profile member-profile"><section className="greeting"><p className="eyebrow">YOUR {profile?.role.toUpperCase() ?? (isRushChair ? "RUSH CHAIR" : "ACTIVE MEMBER")} PROFILE</p><h1>{displayName}</h1><p className="muted">Keep your details current so your chapter can recognize you.</p></section><section className="profile-summary">{profile?.photo_url ? <img src={profile.photo_url} alt={`${displayName} profile`} /> : <span>◌</span>}<div><strong>{displayName}</strong><small>{profile?.phone ?? "Phone not provided"}</small></div></section>{profile && <form className="profile-details" onSubmit={submit}><div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{status && <span role="status">{status}</span>}</div><label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label><label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label>{profile.role === "IFC Admin" ? <label>Your chapter<input value="All recognized houses" readOnly /></label> : <label>Your chapter<select required value={chapter} onChange={(event) => setChapter(event.target.value)}><option value="">Choose your chapter</option>{chapters.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label>}<button type="submit">Save details</button></form>}<section className="profile-account-actions"><button type="button" onClick={switchProfile}>Switch account type</button><button className="logout-button" type="button" onClick={async () => { await fetch("/api/profile", { method: "DELETE" }); window.location.assign("/"); }}>Log out</button></section></div>;
 }
 
 function PnmFeed({ chapter, isRushChair, query, setQuery, pnms: visiblePnms, inviteList, toggleInvite, notes, addNote, messagePnm, updateProgress, loadError }: { chapter: Chapter | null; isRushChair: boolean; query: string; setQuery: (value: string) => void; pnms: Pnm[]; inviteList: string[]; toggleInvite: (id: string) => void; notes: Record<string, string[]>; addNote: (id: string, note: string) => void; messagePnm: () => void; updateProgress: (id: string, status: RushProgressStage) => void; loadError: string | null }) {
@@ -222,11 +217,14 @@ function PnmCard({ pnm, isRushChair, invited, toggleInvite, notes, addNote, mess
   return <article className="pnm-card compact">{pnm.image ? <img className="profile-placeholder pnm-photo" src={pnm.image} alt={`${pnm.name} profile`} /> : <div className="profile-placeholder" aria-label="Default profile photo"></div>}<div className="pnm-card-body"><h2>{pnm.name}</h2><p className="pnm-detail">{pnm.hometown}<br />{pnm.major} · {pnm.year}</p>{isRushChair && <><label className="pnm-progress-select">Rush progress<select value={pnm.status ?? "open invite"} onChange={(event) => updateProgress(pnm.id, event.target.value as RushProgressStage)}>{allowedProgressUpdates(pnm.status).map((stage) => <option value={stage} key={stage}>{stage}</option>)}</select></label><div className="pnm-actions"><button onClick={messagePnm}>Message PNM</button><button className={invited ? "invite-toggle selected" : "invite-toggle"} onClick={() => toggleInvite(pnm.id)}>{invited ? "✓ Invite list" : "+ Invite list"}</button></div></>}<section className="notes"><p>Private discussion notes <span>{notes.length}</span></p>{notes.map((note, index) => <blockquote key={`${note}-${index}`}>{note}</blockquote>)}<div><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add note for actives & chair…" onKeyDown={(event) => { if (event.key === "Enter") { addNote(pnm.id, draft); setDraft(""); } }} /><button onClick={() => { addNote(pnm.id, draft); setDraft(""); }}>Add</button></div></section></div></article>;
 }
 
-function RushSchedule({ chapter, canSchedule }: { chapter: Chapter | null; canSchedule: boolean }) {
+function RushSchedule({ chapter, canSchedule, openEventRequest }: { chapter: Chapter | null; canSchedule: boolean; openEventRequest: number }) {
   const [chapterEvents, setChapterEvents] = useState<RushEventDto[]>([]);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [draft, setDraft] = useState({ event_type: "open invite" as RushProgressStage, address: "", starts_at: "", ends_at: "" });
+  useEffect(() => {
+    if (openEventRequest > 0 && canSchedule && chapter) setCreatingEvent(true);
+  }, [openEventRequest, canSchedule, chapter]);
   useEffect(() => {
     let active = true;
     async function loadEvents() {
