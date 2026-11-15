@@ -76,4 +76,4 @@ PNMs can sign up for an eligible event or cancel that sign-up. An open-invite si
 
 Rush chairs and IFC Admin can update progress with JSON `{ "pnm_id", "chapter_name", "status" }`. The PNM must be associated with that chapter. Updates must stay at the current stage or advance to the next stage; earlier progress remains in history.
 
-On first startup, the active cycle defaults to `Fall 2026` (override with `RUSH_CYCLE_NAME`). The app seeds one demo open-invite event per recognized chapter. The seed addresses are placeholders for local pitch/demo use and should be replaced with the actual chapter venue before presenting location details.
+On first startup, the active cycle defaults to `Fall 2026` (override with `RUSH_CYCLE_NAME`). Events are not automatically seeded; rush chairs create them from the member calendar. The current local SQLite database has 20 fictional PNM records associated across Delta Upsilon, Kappa Sigma, and Sigma Phi Epsilon, with local portrait files in `data/profile-photos`. Those profiles and photos are gitignored local demo data, not migration seeds.

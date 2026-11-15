@@ -71,5 +71,16 @@ we'll update this journal every time we make a milestone or do something
 - Added versioned SQLite schema for rush cycles, exact rush stages, chapter-specific PNM progress and history, chapter events, and event sign-ups.
 - PNM chapter associations and open-invite sign-ups now create open-invite progress without downgrading a later stage. Rush chairs can advance a PNM one stage at a time, with the actor and changes recorded in history.
 - Connected the PNM chapter directory, schedule, member PNM directory, and event calendar to SQLite. Rush chairs can create chapter events and add PNM profiles from the member workspace; those records reload across sessions.
-- Seeded one demo open-invite event per recognized chapter for pitch/demo setup and documented that the addresses are placeholders.
 - Added a profile-switch action that clears the browser cookie while keeping each saved SQLite profile, making multi-profile pitch demos possible on one device.
+
+## 2026-11-15 — Pitch demo database reset
+- Cleared the existing profiles, chapter progress/history, events, and event sign-ups; retained the recognized chapter and rush-stage reference rows.
+- Added 20 fictional PNM profiles, distributed across Delta Upsilon (7), Kappa Sigma (7), and Sigma Phi Epsilon (6), with varied profile fields and stages from `open invite` through `bid night`.
+- Downloaded 20 Random User sample portraits into the local profile photo directory and linked each profile to its photo.
+- Removed five orphaned portrait files belonging to the prior demo profiles.
+- Removed automatic placeholder-event creation so the fresh database remains event-free until rush chairs add real demo events.
+
+## 2026-11-15 — Delta Upsilon demo event schedule
+- Added two future open-invite events for Delta Upsilon to the local SQLite database so PNMs can sign up from the chapter event list.
+- Added an idempotent startup seed for those events when the active rush cycle has no Delta Upsilon open-invite events; the displayed address is labeled as a demo location.
+- Updated the project setup notes to document this demo schedule behavior.

@@ -109,27 +109,6 @@ function seedActiveCycle(database: Database.Database) {
   }
   const cycleId = cycle.id;
 
-  const existingEvent = database.prepare(`
-    SELECT 1 FROM events WHERE rush_cycle_id = ? AND chapter_name = ? AND event_type = 'open invite' LIMIT 1
-  `);
-  const insertEvent = database.prepare(`
-    INSERT INTO events (
-      id, rush_cycle_id, chapter_name, event_type, address, starts_at, ends_at,
-      created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, 'open invite', ?, ?, ?, NULL, ?, ?)
-  `);
-  const firstOpenInvite = new Date();
-  firstOpenInvite.setDate(firstOpenInvite.getDate() + 5);
-  firstOpenInvite.setHours(18, 0, 0, 0);
-  chapterNames.forEach((chapterName, index) => {
-    if (existingEvent.get(cycleId, chapterName)) return;
-    const start = new Date(firstOpenInvite);
-    start.setMinutes((index % 4) * 30);
-    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-    const address = `${100 + index} Fraternity Row, San Luis Obispo, CA 93407`;
-    insertEvent.run(randomUUID(), cycleId, chapterName, address, start.toISOString(), end.toISOString(), now, now);
-  });
-
   const legacyAssociations = database.prepare(`
     SELECT p.id AS pnm_id, h.house_name AS chapter_name
     FROM profiles p JOIN profile_houses h ON h.profile_id = p.id
@@ -148,5 +127,36 @@ function seedActiveCycle(database: Database.Database) {
   for (const { pnm_id, chapter_name } of legacyAssociations) {
     const result = insertProgress.run(cycleId, chapter_name, pnm_id, now, now);
     if (result.changes) insertProgressHistory.run(randomUUID(), cycleId, chapter_name, pnm_id, now);
+  }
+
+  seedDeltaUpsilonDemoEvents(database, cycleId);
+}
+
+function seedDeltaUpsilonDemoEvents(database: Database.Database, cycleId: string) {
+  const hasOpenInviteEvents = database.prepare(`
+    SELECT 1 FROM events
+    WHERE rush_cycle_id = ? AND chapter_name = 'Delta Upsilon' AND event_type = 'open invite'
+    LIMIT 1
+  `).get(cycleId);
+  if (hasOpenInviteEvents) return;
+
+  const now = new Date().toISOString();
+  const insertEvent = database.prepare(`
+    INSERT INTO events (
+      id, rush_cycle_id, chapter_name, event_type, address, starts_at, ends_at,
+      created_by, created_at, updated_at
+    ) VALUES (?, ?, 'Delta Upsilon', 'open invite', ?, ?, ?, NULL, ?, ?)
+  `);
+  const demoAddress = 'Demo location — Delta Upsilon, San Luis Obispo, CA';
+  const demoEvents = [2, 4].map((daysFromNow) => {
+    const startsAt = new Date();
+    startsAt.setDate(startsAt.getDate() + daysFromNow);
+    startsAt.setHours(18, 0, 0, 0);
+    const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
+    return { id: randomUUID(), startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() };
+  });
+
+  for (const event of demoEvents) {
+    insertEvent.run(event.id, cycleId, demoAddress, event.startsAt, event.endsAt, now, now);
   }
 }
