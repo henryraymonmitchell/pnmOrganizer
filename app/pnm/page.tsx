@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { chapters as fallbackChapters, type Chapter } from "@/lib/chapters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
-import { FUNNY_QUESTION_PROMPT, isProfileDto } from "@/lib/profile-domain";
+import { isProfileDto } from "@/lib/profile-domain";
 import { isRushEventList, type RushEventDto } from "@/lib/rush-domain";
 
 type PnmProfileData = { name: string; phone: string; photo: string; photoFile?: File; hometown: string; major: string; associatedHouses: string[]; funnyQuestionAnswer: string };
@@ -37,7 +37,12 @@ export default function PnmPortal() {
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("screen") === "messages") setScreen("messages");
+  }, []);
+
+  useEffect(() => {
     let active = true;
+    const isSwitching = new URLSearchParams(window.location.search).get("switch") === "1";
     async function restoreProfile() {
       try {
         const response = await fetch("/api/profile", { cache: "no-store" });
@@ -45,7 +50,7 @@ export default function PnmPortal() {
           const value: unknown = await response.json();
           if (!isProfileDto(value)) return;
           const data = value;
-          if (active && data.role === "PNM") {
+          if (active && (data.role === "PNM" || isSwitching)) {
             setProfile({
               name: data.full_name,
               phone: data.phone,
@@ -55,7 +60,7 @@ export default function PnmPortal() {
               associatedHouses: data.associated_houses,
               funnyQuestionAnswer: data.funny_question_answer ?? "",
             });
-            setIsReady(true);
+            if (data.role === "PNM") setIsReady(true);
           }
         }
       } catch {
@@ -91,7 +96,7 @@ export default function PnmPortal() {
   const saveProfile = async () => {
     setOnboardingError(null);
     const photoFile = profile.photoFile;
-    if (!photoFile) {
+    if (!photoFile && !profile.photo) {
       setOnboardingError("Please choose a profile photo.");
       return;
     }
@@ -102,9 +107,9 @@ export default function PnmPortal() {
     form.set("phone", profile.phone);
     form.set("hometown", profile.hometown);
     form.set("major", profile.major);
-    form.set("funny_question_answer", profile.funnyQuestionAnswer);
+    form.set("funny_question_answer", "");
     form.set("associated_houses", JSON.stringify(profile.associatedHouses));
-    form.set("photo", photoFile);
+    if (photoFile) form.set("photo", photoFile);
     const response = await fetch("/api/profile", { method: "POST", body: form });
     const result: unknown = await response.json();
     if (!response.ok) {
@@ -131,7 +136,7 @@ export default function PnmPortal() {
     form.set("phone", nextProfile.phone);
     form.set("hometown", nextProfile.hometown);
     form.set("major", nextProfile.major);
-    form.set("funny_question_answer", nextProfile.funnyQuestionAnswer);
+    form.set("funny_question_answer", "");
     form.set("associated_houses", JSON.stringify(nextProfile.associatedHouses));
     try {
       const response = await fetch("/api/profile", { method: "PATCH", body: form });
@@ -202,12 +207,7 @@ export default function PnmPortal() {
     }
   };
 
-  const switchProfile = async () => {
-    try {
-      await fetch("/api/profile", { method: "DELETE" });
-    } catch { /* Continue to the account gateway if the demo request fails. */ }
-    window.location.assign("/");
-  };
+  const switchProfile = () => window.location.assign("/?switch=1");
 
   useEffect(() => {
     let active = true;
@@ -260,13 +260,7 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
     ? profile.name.trim().length > 1
     : step === 1
       ? codeSent ? code.length >= 4 : /^\+[1-9]\d{7,14}$/.test(profile.phone.trim())
-      : step === 2 || Boolean(profile.photoFile);
-  const toggleHouse = (house: string) => setProfile({
-    ...profile,
-    associatedHouses: profile.associatedHouses.includes(house)
-      ? profile.associatedHouses.filter((entry) => entry !== house)
-      : [...profile.associatedHouses, house],
-  });
+      : step === 2 || Boolean(profile.photoFile || profile.photo);
   const continueOnboarding = async () => {
     setLocalError(null);
     setBusy(true);
@@ -297,7 +291,7 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
   return <main className="cal-poly-app onboarding"><section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section><section className="onboarding-body"><div className="step-indicator"><b className={step >= 0 ? "done" : ""}></b><b className={step >= 1 ? "done" : ""}></b><b className={step >= 2 ? "done" : ""}></b><b className={step >= 3 ? "done" : ""}></b></div>
     {step === 0 && <><p className="eyebrow">STEP 1 OF 4</p><h1>What should we<br />call you?</h1><p>Start with your name so every chapter can welcome you personally.</p><label>Your full name<input autoFocus value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} placeholder="e.g. Maya Rodriguez" /></label></>}
     {step === 1 && <><p className="eyebrow">STEP 2 OF 4</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>{demoMode ? "Demo mode: text verification is not configured, so you can continue without a code." : "By continuing, you agree to receive IFC rush texts. You can opt out anytime."}</small></>}
-    {step === 2 && <><p className="eyebrow">STEP 3 OF 4</p><h1>A little more<br />about you.</h1><label>Hometown <span>(optional)</span><input value={profile.hometown} onChange={(event) => setProfile({ ...profile, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label><label>Major <span>(optional)</span><input value={profile.major} onChange={(event) => setProfile({ ...profile, major: event.target.value })} placeholder="e.g. Computer Science" /></label><p className="eyebrow">HOUSES YOU’RE EXPLORING</p><div className="profile-house-list">{fallbackChapters.map((chapter) => <label key={chapter.name}><input type="checkbox" checked={profile.associatedHouses.includes(chapter.name)} onChange={() => toggleHouse(chapter.name)} />{chapter.name}</label>)}</div><label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea value={profile.funnyQuestionAnswer} onChange={(event) => setProfile({ ...profile, funnyQuestionAnswer: event.target.value })} rows={3} /></label></>}
+    {step === 2 && <><p className="eyebrow">STEP 3 OF 4</p><h1>A little more<br />about you.</h1><label>Hometown <span>(optional)</span><input value={profile.hometown} onChange={(event) => setProfile({ ...profile, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label><label>Major <span>(optional)</span><input value={profile.major} onChange={(event) => setProfile({ ...profile, major: event.target.value })} placeholder="e.g. Computer Science" /></label></>}
     {step === 3 && <><p className="eyebrow">STEP 4 OF 4</p><h1>Add a clear<br />photo of you.</h1><p>It helps chapters recognize you at their front booth—so check-in stays quick.</p><label className="photo-upload">{profile.photo ? <img src={profile.photo} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{profile.photo ? "Change photo" : "Choose a photo"}</b></label></>}
     {(localError || error) && <p role="alert">{localError || error}</p>}<button className="onboarding-next" disabled={!canContinue || busy} onClick={continueOnboarding}>{busy ? "Please wait…" : step === 3 ? "Save profile →" : step === 1 && codeSent ? "Verify code →" : "Continue →"}</button>
   </section></main>;
@@ -380,12 +374,10 @@ function PnmMessages({ events, availableChapters }: { events: RushEventDto[]; av
   </div>;
 }
 
-function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfileData; saveDetails: (details: Pick<PnmProfileData, "hometown" | "major" | "associatedHouses" | "funnyQuestionAnswer">) => Promise<boolean>; switchProfile: () => Promise<void> }) {
+function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfileData; saveDetails: (details: Pick<PnmProfileData, "hometown" | "major" | "associatedHouses" | "funnyQuestionAnswer">) => Promise<boolean>; switchProfile: () => void }) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [hometown, setHometown] = useState(profile.hometown);
   const [major, setMajor] = useState(profile.major);
-  const [associatedHouses, setAssociatedHouses] = useState(profile.associatedHouses);
-  const [funnyQuestionAnswer, setFunnyQuestionAnswer] = useState(profile.funnyQuestionAnswer);
   const [detailsStatus, setDetailsStatus] = useState("");
 
   useEffect(() => {
@@ -394,9 +386,7 @@ function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfi
   useEffect(() => {
     setHometown(profile.hometown);
     setMajor(profile.major);
-    setAssociatedHouses(profile.associatedHouses);
-    setFunnyQuestionAnswer(profile.funnyQuestionAnswer);
-  }, [profile.hometown, profile.major, profile.associatedHouses, profile.funnyQuestionAnswer]);
+  }, [profile.hometown, profile.major]);
 
   const enableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -409,7 +399,7 @@ function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfi
   const submitDetails = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDetailsStatus("Saving…");
-    setDetailsStatus(await saveDetails({ hometown, major, associatedHouses, funnyQuestionAnswer }) ? "Saved" : "Could not save. Please try again.");
+    setDetailsStatus(await saveDetails({ hometown, major, associatedHouses: profile.associatedHouses, funnyQuestionAnswer: profile.funnyQuestionAnswer }) ? "Saved" : "Could not save. Please try again.");
   };
 
   const notificationCopy = notificationPermission === "granted"
@@ -427,9 +417,6 @@ function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfi
       <div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{detailsStatus && <span role="status">{detailsStatus}</span>}</div>
       <label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label>
       <label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label>
-      <p className="eyebrow">HOUSES YOU’RE EXPLORING</p>
-      <div className="profile-house-list">{fallbackChapters.map((chapter) => <label key={chapter.name}><input type="checkbox" checked={associatedHouses.includes(chapter.name)} onChange={() => setAssociatedHouses((current) => current.includes(chapter.name) ? current.filter((house) => house !== chapter.name) : [...current, chapter.name])} />{chapter.name}</label>)}</div>
-      <label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea value={funnyQuestionAnswer} onChange={(event) => setFunnyQuestionAnswer(event.target.value)} rows={3} /></label>
       <button type="submit">Save details</button>
     </form>
     <section className="notification-settings">
@@ -439,7 +426,7 @@ function PnmProfile({ profile, saveDetails, switchProfile }: { profile: PnmProfi
         {notificationPermission === "granted" ? "On" : notificationPermission === "denied" ? "Blocked" : "Enable"}
       </button>
     </section>
-    <button className="schedule-event" type="button" onClick={() => void switchProfile()}>Switch profile</button>
+    <section className="profile-account-actions"><button type="button" onClick={switchProfile}>Switch account type</button><button className="logout-button" type="button" onClick={async () => { await fetch("/api/profile", { method: "DELETE" }); window.location.assign("/"); }}>Log out</button></section>
   </div>;
 }
 

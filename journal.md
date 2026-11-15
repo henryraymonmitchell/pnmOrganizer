@@ -73,6 +73,7 @@ we'll update this journal every time we make a milestone or do something
 - Connected the PNM chapter directory, schedule, member PNM directory, and event calendar to SQLite. Rush chairs can create chapter events and add PNM profiles from the member workspace; those records reload across sessions.
 - Added a profile-switch action that clears the browser cookie while keeping each saved SQLite profile, making multi-profile pitch demos possible on one device.
 
+<<<<<<< HEAD
 ## 2026-11-15 — Pitch demo database reset
 - Cleared the existing profiles, chapter progress/history, events, and event sign-ups; retained the recognized chapter and rush-stage reference rows.
 - Added 20 fictional PNM profiles, distributed across Delta Upsilon (7), Kappa Sigma (7), and Sigma Phi Epsilon (6), with varied profile fields and stages from `open invite` through `bid night`.
@@ -84,3 +85,10 @@ we'll update this journal every time we make a milestone or do something
 - Added two future open-invite events for Delta Upsilon to the local SQLite database so PNMs can sign up from the chapter event list.
 - Added an idempotent startup seed for those events when the active rush cycle has no Delta Upsilon open-invite events; the displayed address is labeled as a demo location.
 - Updated the project setup notes to document this demo schedule behavior.
+=======
+## 2026-11-15 — Profile and member experience refinements
+- Added logout and account-type switching that retains a saved profile and photo while allowing the user to choose a new role.
+- Simplified PNM optional profile fields by removing the house-preference and personal-question controls from onboarding and editing.
+- Added a required branded chapter-card picker for Active Member and Rush Chair profile completion.
+- Kept the SQLite-backed member directory search and private PNM photo delivery, with search and progress data reconnected to the expanded SQLite backend.
+>>>>>>> d1a596d98b4d886ad0bff2ce65d8572ad7ba4462
