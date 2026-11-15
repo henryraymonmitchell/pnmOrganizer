@@ -6,16 +6,17 @@ import { getRequestProfile } from "@/lib/server/request-profile";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
+    const { eventId } = await params;
     const profile = getRequestProfile(request);
     if (!profile) return NextResponse.json({ error: "Profile not found." }, { status: 404 });
     if (profile.role !== "PNM") return NextResponse.json({ error: "Only PNMs can sign up for events." }, { status: 403 });
 
     const database = getDatabase();
-    const event = getEventById(params.eventId, database);
+    const event = getEventById(eventId, database);
     if (!event || event.rush_cycle_id !== getActiveRushCycleId(database)) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }
@@ -50,12 +51,13 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
+    const { eventId } = await params;
     const profile = getRequestProfile(request);
     if (!profile) return NextResponse.json({ error: "Profile not found." }, { status: 404 });
     if (profile.role !== "PNM") return NextResponse.json({ error: "Only PNMs can cancel event sign-ups." }, { status: 403 });
 
     const database = getDatabase();
-    const event = getEventById(params.eventId, database);
+    const event = getEventById(eventId, database);
     if (!event || event.rush_cycle_id !== getActiveRushCycleId(database)) {
       return NextResponse.json({ error: "Event not found." }, { status: 404 });
     }

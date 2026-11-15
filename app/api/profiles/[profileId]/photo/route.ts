@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 
 const PHOTO_DIRECTORY = resolve("data/profile-photos");
 
-type RouteContext = { params: { profileId: string } };
+type RouteContext = { params: Promise<{ profileId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
+    const { profileId } = await params;
     const viewer = getRequestProfile(request);
-    const target = getProfileById(params.profileId);
+    const target = getProfileById(profileId);
     if (!viewer || !target?.photo_path || target.role !== "PNM") {
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }

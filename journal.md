@@ -104,3 +104,8 @@ we'll update this journal every time we make a milestone or do something
 - Added a Docker production build and Railway configuration for the Next.js app.
 - Added a one-time, opt-in demo-data startup seed that preserves real data on the persistent `/app/data` volume.
 - Documented the required persistent volume and deployment settings so SQLite databases and profile photos survive redeploys.
+
+## 2026-11-15 — Secure hosted build compatibility
+- Upgraded Next.js to the current patched release required by the hosting security checks, retaining a pinned version for reproducible Docker builds.
+- Updated dynamic route handler parameter access and the SQLite server-package configuration for Next.js 16.
+- Confirmed the clean production build serves the PNM page and database-backed API routes locally.
