@@ -142,7 +142,7 @@ export default function PnmPortal() {
     {screen === "home" && <ChapterDirectory name={profile.name} selectChapter={selectChapter} loadError={chapterLoadError} />}
     {screen === "chapter" && selectedChapter && <ChapterEvents chapter={selectedChapter} goBack={() => setScreen("home")} scheduled={mySchedule} addEvent={addEvent} />}
     {screen === "schedule" && <PersonalSchedule ids={mySchedule} removeEvent={(id) => setMySchedule((current) => current.filter((event) => event !== id))} />}
-    {screen === "messages" && <PnmMessages />}
+    {screen === "messages" && <PnmMessages ids={mySchedule} availableChapters={chapters} />}
     {screen === "profile" && <PnmProfile profile={profile} saveDetails={saveProfileDetails} />}
     <nav className="bottom-nav pnm-nav"><button className={screen === "home" ? "nav-active" : ""} onClick={() => setScreen("home")}><span>⌂</span>Home</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>My schedule</button><button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span className="plane-icon">➤</span>Messages</button><button className={screen === "profile" ? "nav-active" : ""} onClick={() => setScreen("profile")}><span>◌</span>Profile</button></nav>
   </main>;
@@ -193,7 +193,7 @@ function ChapterDirectory({ name, selectChapter, loadError }: { name: string; se
 
 function ChapterEvents({ chapter, goBack, scheduled, addEvent }: { chapter: Chapter; goBack: () => void; scheduled: string[]; addEvent: (id: string) => void }) { const chapterEvents = events.filter((event) => event.chapter === chapter.name); return <div className="shell event-detail chapter-theme" style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}><button className="back-button" onClick={goBack}>← All chapters</button><section className="chapter-detail-hero"><span className="chapter-display-letters">{chapter.short}</span><p>CAL POLY IFC CHAPTER</p><h1>{chapter.name}</h1></section><button className="message-chairs" onClick={() => window.location.assign(`/pnm/message?chapter=${encodeURIComponent(chapter.name)}&mark=${encodeURIComponent(chapter.short)}`)}><img className="rush-chair-photo" src="/brand/rush-chair.jpg" alt="Rush chair" /><div><strong>Message rush chairs</strong><small>Ask a private question about this chapter</small></div><b>→</b></button><section className="section-heading"><div><p className="eyebrow">UPCOMING EVENTS</p><h3>Plan your visit</h3></div></section><div className="nfc-note"><span>⌁</span><p>Attendance is only recorded when you scan the NFC tag at the front booth.</p></div><section className="chapter-events">{chapterEvents.map((event) => <article className="chapter-event" key={event.id}><div><span>{event.date}</span><h3>{event.title}</h3><p>◷ {event.time}<br />◉ {event.place}</p></div><button className={scheduled.includes(event.id) ? "added" : "add-event"} onClick={() => addEvent(event.id)}>{scheduled.includes(event.id) ? "✓ Added" : "+ Add"}</button></article>)}</section></div>; }
 
-function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) => void }) {
+function PersonalSchedule({ ids, removeEvent }: { ids: string[]; removeEvent: (id: string) => void }) {
   const [selectedEvent, setSelectedEvent] = useState<RushEvent | null>(null);
   const [nfcStatus, setNfcStatus] = useState<string | null>(null);
   const scheduledEvents = events
@@ -241,17 +241,18 @@ function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) =>
           <div className="today-event-list">
             {dayEvents.map((event) => {
               const chapter = chapters.find((item) => item.name === event.chapter)!;
-              return <button
-                className="today-event-card"
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                aria-label={`${chapter.name} ${event.title}, ${event.time}. View details.`}
-                style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}
-              >
-                <span className="today-event-mark">{chapter.short}</span>
-                <span className="today-event-copy"><small>{chapter.name}</small><strong>{event.title}</strong><em>◷ {event.time}</em></span>
-                <b>›</b>
-              </button>;
+              return <article className="today-event-row" key={event.id} style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}>
+                <button
+                  className="today-event-card"
+                  onClick={() => setSelectedEvent(event)}
+                  aria-label={`${chapter.name} ${event.title}, ${event.time}. View details.`}
+                >
+                  <span className="today-event-mark">{chapter.short}</span>
+                  <span className="today-event-copy"><small>{chapter.name}</small><strong>{event.title}</strong><em>◷ {event.time}</em></span>
+                  <b>›</b>
+                </button>
+                <button className="remove-scheduled-event" type="button" onClick={() => removeEvent(event.id)} aria-label={`Remove ${event.title} from your schedule`}>Remove</button>
+              </article>;
             })}
           </div>
         </section>;
@@ -265,25 +266,26 @@ function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) =>
         <button className="sheet-close" onClick={() => setSelectedEvent(null)} aria-label="Close location">×</button>
         <span className="location-mark">{selectedChapter.short}</span>
         <p className="eyebrow">{selectedChapter.name.toUpperCase()}</p>
-        <h2>{selectedEvent.title}</h2><p>◷ {selectedEvent.time}</p><a className="event-address" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.place)}`} target="_blank" rel="noreferrer">⌖ {selectedEvent.place} ↗</a>
+        <h2>{selectedEvent.title}</h2><p>◷ {selectedEvent.time}</p><a className="event-address event-map-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.place)}`} target="_blank" rel="noreferrer">⌖ {selectedEvent.place}<span>Open in Maps ↗</span></a>
         <button className="nfc-check-in" type="button" onClick={scanNfcTag}>⌁ Scan NFC tag to check in</button>
         {nfcStatus && <p className="nfc-scan-status" role="status">{nfcStatus}</p>}
-        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.place)}`} target="_blank" rel="noreferrer">Open in Maps ↗</a>
       </section>
     </div>}
   </div>;
 }
 
-function PnmMessages() {
+function PnmMessages({ ids, availableChapters }: { ids: string[]; availableChapters: Chapter[] }) {
   const openChat = (chapter: string, mark: string) => window.location.assign(`/pnm/message?chapter=${encodeURIComponent(chapter)}&mark=${encodeURIComponent(mark)}`);
-  const chatChapters = ["Alpha Epsilon Pi", "Phi Delta Theta"].map((name) => chapters.find((chapter) => chapter.name === name)!);
+  const chatChapters = Array.from(new Set(ids.map((id) => events.find((event) => event.id === id)?.chapter).filter((name): name is string => Boolean(name))))
+    .map((name) => availableChapters.find((chapter) => chapter.name === name))
+    .filter((chapter): chapter is Chapter => Boolean(chapter));
   return <div className="shell pnm-messages">
-    <section className="greeting"><p className="eyebrow">PRIVATE CHAPTER CHATS</p><h1>Messages</h1><p className="muted">Your private conversations with chapter rush chairs.</p></section>
-    <section className="message-inbox">
+    <section className="greeting"><p className="eyebrow">PRIVATE CHAPTER CHATS</p><h1>Messages</h1><p className="muted">Message the rush chairs for chapters on your schedule.</p></section>
+    {chatChapters.length > 0 ? <section className="message-inbox">
       {chatChapters.map((chapter) => <button className="chapter-chat-tile" key={chapter.name} onClick={() => openChat(chapter.name, chapter.short)} style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}>
         <span className="inbox-mark">{chapter.short}</span><div><strong>{chapter.name} rush chairs</strong><small>Start a conversation</small></div><b className="plane-icon">➤</b>
       </button>)}
-    </section>
+    </section> : <section className="empty-state message-empty"><span>✦</span><h3>No chapter chats yet</h3><p>Add an event to your schedule to message that chapter’s rush chairs.</p></section>}
     <p className="inbox-privacy">Chats are private between you and each chapter’s rush chairs.</p>
   </div>;
 }
