@@ -54,3 +54,9 @@ we'll update this journal every time we make a milestone or do something
 ## 2026-11-14 — PNM directory contract
 - Added a migration that registers authenticated PNM profiles in a restricted directory view for active members.
 - The directory exposes only name, hometown, major, and profile photo path; it does not expose PNM phone numbers. Active-member access and PNM photo access are guarded by membership-based policies.
+
+## 2026-11-14 — SQLite profile persistence
+- Added a local SQLite profile store for UUID, role, name, contact and optional details, funny-question answer, photo path, house associations, and created/updated timestamps.
+- Added profile read/create/update API routes and private local photo serving; the browser profile cookie survives sessions on the same device.
+- Connected PNM and member/admin profile setup flows to SQLite. IFC Admin profiles associate with all recognized houses; Rush Chair and Active Member profiles select one; PNM profiles may select multiple.
+- Added the configurable funny-question prompt in TypeScript and ignored the local database/photo data directory.

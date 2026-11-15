@@ -1,24 +1,13 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import { chapters as fallbackChapters, type Chapter } from "@/lib/chapters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
+import { FUNNY_QUESTION_PROMPT, isProfileDto } from "@/lib/profile-domain";
 
-type Chapter = { name: string; short: string; colors: [string, string] };
 type RushEvent = { id: string; chapter: string; title: string; date: string; time: string; place: string; slot: number };
-type PnmProfileData = { name: string; phone: string; photo: string; photoFile?: File; hometown: string; major: string };
+type PnmProfileData = { name: string; phone: string; photo: string; photoFile?: File; hometown: string; major: string; associatedHouses: string[]; funnyQuestionAnswer: string };
 
-const fallbackChapters: Chapter[] = [
-  { name: "Alpha Epsilon Pi", short: "AΕΠ", colors: ["#0e5b9a", "#f8c629"] }, { name: "Alpha Sigma Phi", short: "ΑΣΦ", colors: ["#cf1530", "#929ba0"] },
-  { name: "Beta Theta Pi", short: "ΒΘΠ", colors: ["#142d60", "#ffffff"] }, { name: "Delta Chi", short: "ΔΧ", colors: ["#e0062f", "#ffd34e"] },
-  { name: "Delta Sigma Phi", short: "ΔΣΦ", colors: ["#008f3b", "#ffd300"] }, { name: "Delta Upsilon", short: "ΔΥ", colors: ["#2f619b", "#ffce47"] },
-  { name: "Kappa Sigma", short: "ΚΣ", colors: ["#be0d3d", "#ffffff"] }, { name: "Lambda Chi Alpha", short: "ΛΧΑ", colors: ["#00733e", "#dca82c"] },
-  { name: "Phi Delta Theta", short: "ΦΔΘ", colors: ["#192b5f", "#d9b56d"] }, { name: "Phi Gamma Delta", short: "FIJI", colors: ["#48206f", "#ffffff"] },
-  { name: "Phi Kappa Psi", short: "ΦΚΨ", colors: ["#f2a821", "#171717"] }, { name: "Phi Sigma Kappa", short: "ΦΣΚ", colors: ["#c8143b", "#d6d6d6"] },
-  { name: "Pi Kappa Phi", short: "ΠΚΦ", colors: ["#00529b", "#e2ad2e"] }, { name: "Sigma Nu", short: "ΣΝ", colors: ["#b29a66", "#ffffff"] },
-  { name: "Sigma Phi Epsilon", short: "ΣΦΕ", colors: ["#70399a", "#ffffff"] }, { name: "Sigma Pi", short: "ΣΠ", colors: ["#4c466f", "#ffffff"] },
-  { name: "Theta Chi", short: "ΘΧ", colors: ["#da1830", "#ffffff"] }, { name: "Zeta Beta Tau", short: "ΖΒΤ", colors: ["#103b62", "#ffcc19"] },
-  { name: "Pi Kappa Alpha", short: "ΠΚΑ", colors: ["#84202c", "#ffffff"] }
-];
 const chapters = fallbackChapters;
 
 const openHouseTimes = ["4:00 – 6:00 PM", "5:00 – 7:00 PM", "6:00 – 8:00 PM", "7:00 – 9:00 PM"];
@@ -29,8 +18,9 @@ const events: RushEvent[] = fallbackChapters.flatMap((chapter, index) => [
 ]);
 
 export default function PnmPortal() {
-  const [profile, setProfile] = useState<PnmProfileData>({ name: "", phone: "", photo: "", hometown: "", major: "" });
+  const [profile, setProfile] = useState<PnmProfileData>({ name: "", phone: "", photo: "", hometown: "", major: "", associatedHouses: [], funnyQuestionAnswer: "" });
   const [step, setStep] = useState(0);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [screen, setScreen] = useState<"home" | "chapter" | "schedule" | "messages" | "profile">("home");
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
@@ -42,14 +32,30 @@ export default function PnmPortal() {
   useEffect(() => {
     let active = true;
     async function restoreProfile() {
-      if (!isSupabaseConfigured) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!active || !user) return;
-      const { data } = await supabase.from("profiles").select("full_name, phone, photo_path, hometown, major").eq("id", user.id).maybeSingle();
-      if (!active || !data) return;
-      const { data: photo } = await supabase.storage.from("profile-photos").createSignedUrl(data.photo_path, 60 * 60);
-      setProfile({ name: data.full_name, phone: data.phone, photo: photo?.signedUrl ?? "", hometown: data.hometown ?? "", major: data.major ?? "" });
-      setIsReady(true);
+      try {
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        if (response.ok) {
+          const value: unknown = await response.json();
+          if (!isProfileDto(value)) return;
+          const data = value;
+          if (active && data.role === "PNM") {
+            setProfile({
+              name: data.full_name,
+              phone: data.phone,
+              photo: data.photo_url ?? "",
+              hometown: data.hometown ?? "",
+              major: data.major ?? "",
+              associatedHouses: data.associated_houses,
+              funnyQuestionAnswer: data.funny_question_answer ?? "",
+            });
+            setIsReady(true);
+          }
+        }
+      } catch {
+        // A missing local profile starts a new onboarding session.
+      } finally {
+        if (active) setProfileLoaded(true);
+      }
     }
     void restoreProfile();
     return () => { active = false; };
@@ -57,50 +63,57 @@ export default function PnmPortal() {
 
   const saveProfile = async () => {
     setOnboardingError(null);
-    if (!isSupabaseConfigured) {
-      setIsReady(true);
-      return;
-    }
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setOnboardingError("Verify your phone number before saving your profile.");
-      return;
-    }
     const photoFile = profile.photoFile;
     if (!photoFile) {
       setOnboardingError("Please choose a profile photo.");
       return;
     }
-    const extension = photoFile.type === "image/png" ? "png" : photoFile.type === "image/webp" ? "webp" : "jpg";
-    const photoPath = `${user.id}/profile.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("profile-photos").upload(photoPath, photoFile, { upsert: true, contentType: photoFile.type });
-    if (uploadError) {
-      setOnboardingError(`Photo upload failed: ${uploadError.message}`);
+
+    const form = new FormData();
+    form.set("role", "PNM");
+    form.set("full_name", profile.name);
+    form.set("phone", profile.phone);
+    form.set("hometown", profile.hometown);
+    form.set("major", profile.major);
+    form.set("funny_question_answer", profile.funnyQuestionAnswer);
+    form.set("associated_houses", JSON.stringify(profile.associatedHouses));
+    form.set("photo", photoFile);
+    const response = await fetch("/api/profile", { method: "POST", body: form });
+    const result: unknown = await response.json();
+    if (!response.ok) {
+      const message = result && typeof result === "object" && "error" in result && typeof result.error === "string"
+        ? result.error
+        : "Could not save your profile.";
+      setOnboardingError(message);
       return;
     }
-    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: profile.name.trim(), phone: user.phone ?? profile.phone, photo_path: photoPath, hometown: profile.hometown.trim() || null, major: profile.major.trim() || null }, { onConflict: "id" });
-    if (profileError) {
-      setOnboardingError(`Profile save failed: ${profileError.message}`);
+    if (!isProfileDto(result)) {
+      setOnboardingError("The saved profile response was invalid.");
       return;
     }
-    const { error: membershipError } = await supabase.from("chapter_memberships").upsert({ user_id: user.id, chapter_id: null, role: "pnm", status: "active" }, { onConflict: "user_id,chapter_id,role" });
-    if (membershipError) {
-      setOnboardingError(`Profile saved, but rush directory registration failed: ${membershipError.message}`);
-      return;
-    }
-    const { data: signedPhoto } = await supabase.storage.from("profile-photos").createSignedUrl(photoPath, 60 * 60);
-    setProfile({ ...profile, photo: signedPhoto?.signedUrl ?? "" });
+    const saved = result;
+    setProfile({ ...profile, photo: saved.photo_url ?? "", photoFile: undefined });
     setIsReady(true);
   };
 
-  const saveProfileDetails = async (details: Pick<PnmProfileData, "hometown" | "major">) => {
+  const saveProfileDetails = async (details: Pick<PnmProfileData, "hometown" | "major" | "associatedHouses" | "funnyQuestionAnswer">) => {
     const nextProfile = { ...profile, ...details };
-    setProfile(nextProfile);
-    if (!isSupabaseConfigured) return true;
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) return false;
-    const { error } = await supabase.from("profiles").update({ hometown: details.hometown.trim() || null, major: details.major.trim() || null }).eq("id", user.id);
-    return !error;
+    const form = new FormData();
+    form.set("role", "PNM");
+    form.set("full_name", nextProfile.name);
+    form.set("phone", nextProfile.phone);
+    form.set("hometown", nextProfile.hometown);
+    form.set("major", nextProfile.major);
+    form.set("funny_question_answer", nextProfile.funnyQuestionAnswer);
+    form.set("associated_houses", JSON.stringify(nextProfile.associatedHouses));
+    try {
+      const response = await fetch("/api/profile", { method: "PATCH", body: form });
+      if (!response.ok) return false;
+      setProfile(nextProfile);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -132,6 +145,7 @@ export default function PnmPortal() {
     return () => { active = false; };
   }, []);
 
+  if (!profileLoaded) return <main className="cal-poly-app onboarding"><section className="onboarding-body"><p>Loading your saved profile…</p></section></main>;
   if (!isReady) return <Onboarding profile={profile} setProfile={setProfile} step={step} setStep={setStep} complete={saveProfile} error={onboardingError} />;
 
   const selectChapter = (chapter: Chapter) => { setSelectedChapter(chapter); setScreen("chapter"); };
@@ -155,7 +169,17 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
   const [localError, setLocalError] = useState<string | null>(null);
   const demoMode = !isSupabaseConfigured;
   const updatePhoto = (event: ChangeEvent<HTMLInputElement>) => { const photoFile = event.target.files?.[0]; if (photoFile) setProfile({ ...profile, photoFile, photo: URL.createObjectURL(photoFile) }); };
-  const canContinue = step === 0 ? profile.name.trim().length > 1 : step === 1 ? codeSent ? code.length >= 4 : profile.phone.trim().length > 6 : Boolean(profile.photoFile);
+  const canContinue = step === 0
+    ? profile.name.trim().length > 1
+    : step === 1
+      ? codeSent ? code.length >= 4 : /^\+[1-9]\d{7,14}$/.test(profile.phone.trim())
+      : step === 2 || Boolean(profile.photoFile);
+  const toggleHouse = (house: string) => setProfile({
+    ...profile,
+    associatedHouses: profile.associatedHouses.includes(house)
+      ? profile.associatedHouses.filter((entry) => entry !== house)
+      : [...profile.associatedHouses, house],
+  });
   const continueOnboarding = async () => {
     setLocalError(null);
     setBusy(true);
@@ -171,6 +195,8 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
         if (verifyError) throw verifyError;
         setStep(2);
       } else if (step === 2) {
+        setStep(3);
+      } else if (step === 3) {
         await complete();
       } else {
         setStep(step + 1);
@@ -181,11 +207,12 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
       setBusy(false);
     }
   };
-  return <main className="cal-poly-app onboarding"><section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section><section className="onboarding-body"><div className="step-indicator"><b className={step >= 0 ? "done" : ""}></b><b className={step >= 1 ? "done" : ""}></b><b className={step >= 2 ? "done" : ""}></b></div>
-    {step === 0 && <><p className="eyebrow">STEP 1 OF 3</p><h1>What should we<br />call you?</h1><p>Start with your name so every chapter can welcome you personally.</p><label>Your full name<input autoFocus value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} placeholder="e.g. Maya Rodriguez" /></label></>}
-    {step === 1 && <><p className="eyebrow">STEP 2 OF 3</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>{demoMode ? "Demo mode: text verification is not configured, so you can continue without a code." : "By continuing, you agree to receive IFC rush texts. You can opt out anytime."}</small></>}
-    {step === 2 && <><p className="eyebrow">STEP 3 OF 3</p><h1>Add a clear<br />photo of you.</h1><p>It helps chapters recognize you at their front booth—so check-in stays quick.</p><label className="photo-upload">{profile.photo ? <img src={profile.photo} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/*" onChange={updatePhoto} /><b>{profile.photo ? "Change photo" : "Choose a photo"}</b></label></>}
-    {(localError || error) && <p role="alert">{localError || error}</p>}<button className="onboarding-next" disabled={!canContinue || busy} onClick={continueOnboarding}>{busy ? "Please wait…" : step === 2 ? "Save profile →" : step === 1 && codeSent ? "Verify code →" : "Continue →"}</button><button className="later-link" type="button">You can add your major and hometown later</button>
+  return <main className="cal-poly-app onboarding"><section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section><section className="onboarding-body"><div className="step-indicator"><b className={step >= 0 ? "done" : ""}></b><b className={step >= 1 ? "done" : ""}></b><b className={step >= 2 ? "done" : ""}></b><b className={step >= 3 ? "done" : ""}></b></div>
+    {step === 0 && <><p className="eyebrow">STEP 1 OF 4</p><h1>What should we<br />call you?</h1><p>Start with your name so every chapter can welcome you personally.</p><label>Your full name<input autoFocus value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} placeholder="e.g. Maya Rodriguez" /></label></>}
+    {step === 1 && <><p className="eyebrow">STEP 2 OF 4</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>{demoMode ? "Demo mode: text verification is not configured, so you can continue without a code." : "By continuing, you agree to receive IFC rush texts. You can opt out anytime."}</small></>}
+    {step === 2 && <><p className="eyebrow">STEP 3 OF 4</p><h1>A little more<br />about you.</h1><label>Hometown <span>(optional)</span><input value={profile.hometown} onChange={(event) => setProfile({ ...profile, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label><label>Major <span>(optional)</span><input value={profile.major} onChange={(event) => setProfile({ ...profile, major: event.target.value })} placeholder="e.g. Computer Science" /></label><p className="eyebrow">HOUSES YOU’RE EXPLORING</p><div className="profile-house-list">{fallbackChapters.map((chapter) => <label key={chapter.name}><input type="checkbox" checked={profile.associatedHouses.includes(chapter.name)} onChange={() => toggleHouse(chapter.name)} />{chapter.name}</label>)}</div><label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea value={profile.funnyQuestionAnswer} onChange={(event) => setProfile({ ...profile, funnyQuestionAnswer: event.target.value })} rows={3} /></label></>}
+    {step === 3 && <><p className="eyebrow">STEP 4 OF 4</p><h1>Add a clear<br />photo of you.</h1><p>It helps chapters recognize you at their front booth—so check-in stays quick.</p><label className="photo-upload">{profile.photo ? <img src={profile.photo} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{profile.photo ? "Change photo" : "Choose a photo"}</b></label></>}
+    {(localError || error) && <p role="alert">{localError || error}</p>}<button className="onboarding-next" disabled={!canContinue || busy} onClick={continueOnboarding}>{busy ? "Please wait…" : step === 3 ? "Save profile →" : step === 1 && codeSent ? "Verify code →" : "Continue →"}</button>
   </section></main>;
 }
 
@@ -290,10 +317,12 @@ function PnmMessages({ ids, availableChapters }: { ids: string[]; availableChapt
   </div>;
 }
 
-function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDetails: (details: Pick<PnmProfileData, "hometown" | "major">) => Promise<boolean> }) {
+function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDetails: (details: Pick<PnmProfileData, "hometown" | "major" | "associatedHouses" | "funnyQuestionAnswer">) => Promise<boolean> }) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [hometown, setHometown] = useState(profile.hometown);
   const [major, setMajor] = useState(profile.major);
+  const [associatedHouses, setAssociatedHouses] = useState(profile.associatedHouses);
+  const [funnyQuestionAnswer, setFunnyQuestionAnswer] = useState(profile.funnyQuestionAnswer);
   const [detailsStatus, setDetailsStatus] = useState("");
 
   useEffect(() => {
@@ -302,7 +331,9 @@ function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDet
   useEffect(() => {
     setHometown(profile.hometown);
     setMajor(profile.major);
-  }, [profile.hometown, profile.major]);
+    setAssociatedHouses(profile.associatedHouses);
+    setFunnyQuestionAnswer(profile.funnyQuestionAnswer);
+  }, [profile.hometown, profile.major, profile.associatedHouses, profile.funnyQuestionAnswer]);
 
   const enableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -315,7 +346,7 @@ function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDet
   const submitDetails = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDetailsStatus("Saving…");
-    setDetailsStatus(await saveDetails({ hometown, major }) ? "Saved" : "Could not save. Please try again.");
+    setDetailsStatus(await saveDetails({ hometown, major, associatedHouses, funnyQuestionAnswer }) ? "Saved" : "Could not save. Please try again.");
   };
 
   const notificationCopy = notificationPermission === "granted"
@@ -333,6 +364,9 @@ function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDet
       <div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{detailsStatus && <span role="status">{detailsStatus}</span>}</div>
       <label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label>
       <label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label>
+      <p className="eyebrow">HOUSES YOU’RE EXPLORING</p>
+      <div className="profile-house-list">{fallbackChapters.map((chapter) => <label key={chapter.name}><input type="checkbox" checked={associatedHouses.includes(chapter.name)} onChange={() => setAssociatedHouses((current) => current.includes(chapter.name) ? current.filter((house) => house !== chapter.name) : [...current, chapter.name])} />{chapter.name}</label>)}</div>
+      <label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea value={funnyQuestionAnswer} onChange={(event) => setFunnyQuestionAnswer(event.target.value)} rows={3} /></label>
       <button type="submit">Save details</button>
     </form>
     <section className="notification-settings">

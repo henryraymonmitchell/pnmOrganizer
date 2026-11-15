@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
+import { FUNNY_QUESTION_PROMPT, isProfileDto, type ProfileDto, type ProfileRole } from "@/lib/profile-domain";
 
 type Pnm = { id: string; name: string; major: string; year: string; hometown: string; attended: string; tags: string[]; image: string };
 
@@ -15,13 +16,38 @@ const pnms: Pnm[] = [
 export default function MemberPortal() {
   const [approval, setApproval] = useState<string | null>(null);
   const [chairSetting, setChairSetting] = useState<string | null>(null);
+  const [roleSetting, setRoleSetting] = useState<ProfileRole | null>(null);
+  const [myProfile, setMyProfile] = useState<ProfileDto | null>(null);
   const [screen, setScreen] = useState<"feed" | "schedule" | "chair" | "messages" | "profile">("feed");
   const [query, setQuery] = useState("");
   const [pnmList, setPnmList] = useState(pnms);
   const [addingPnm, setAddingPnm] = useState(false);
   const [inviteList, setInviteList] = useState<string[]>([]);
   const [notes, setNotes] = useState<Record<string, string[]>>({});
-  useEffect(() => { const params = new URLSearchParams(window.location.search); const chair = params.get("chair"); setApproval(params.get("approval")); setChairSetting(chair); if (chair === "yes" && params.get("approval") !== "pending") setScreen("chair"); }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const chair = params.get("chair");
+    const routeRole = params.get("role");
+    setApproval(params.get("approval"));
+    setChairSetting(chair);
+    setRoleSetting(routeRole === "IFC Admin" || routeRole === "Rush Chair" || routeRole === "Active Member" ? routeRole : null);
+    if (chair === "yes" && params.get("approval") !== "pending") setScreen("chair");
+  }, []);
+  useEffect(() => {
+    let active = true;
+    async function loadOwnProfile() {
+      try {
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        if (!response.ok) return;
+        const value: unknown = await response.json();
+        if (active && isProfileDto(value)) setMyProfile(value);
+      } catch {
+        // The workspace can still show its demo data without a saved profile.
+      }
+    }
+    void loadOwnProfile();
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     let active = true;
     async function loadPnmDirectory() {
@@ -48,18 +74,19 @@ export default function MemberPortal() {
     void loadPnmDirectory();
     return () => { active = false; };
   }, []);
-  const isRushChair = chairSetting === "yes";
+  const isRushChair = myProfile?.role === "Rush Chair" || roleSetting === "Rush Chair" || chairSetting === "yes";
+  const currentRole = myProfile?.role ?? roleSetting ?? (isRushChair ? "Rush Chair" : "Active Member");
   const filtered = useMemo(() => pnmList.filter((pnm) => `${pnm.name} ${pnm.major} ${pnm.year} ${pnm.hometown} ${pnm.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase())), [query, pnmList]);
   const toggleInvite = (id: string) => setInviteList((current) => current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]);
   const addNote = (id: string, note: string) => { if (!note.trim()) return; setNotes((current) => ({ ...current, [id]: [...(current[id] || []), note.trim()] })); };
 
   if (approval === "pending") return <ApprovalStatus chair={chairSetting === "yes"} />;
-  return <main className="cal-poly-app member-app"><header className="cal-poly-header"><div className="brand brand-lockup"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /></div><span className="role-label">{isRushChair ? "RUSH CHAIR HQ" : "MEMBER HQ"}</span><button className={isRushChair ? "avatar member-avatar chair-avatar" : "avatar member-avatar"} onClick={() => setScreen("profile")} aria-label="Open profile">{isRushChair ? <img src="/brand/rush-chair.jpg" alt="Rush chair profile" /> : "JM"}</button></header>
+  return <main className="cal-poly-app member-app"><header className="cal-poly-header"><div className="brand brand-lockup"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /></div><span className="role-label">{currentRole === "IFC Admin" ? "IFC ADMIN" : isRushChair ? "RUSH CHAIR HQ" : "MEMBER HQ"}</span><button className={isRushChair ? "avatar member-avatar chair-avatar" : "avatar member-avatar"} onClick={() => setScreen("profile")} aria-label="Open profile">{myProfile?.full_name ? myProfile.full_name.slice(0, 2).toUpperCase() : isRushChair ? <img src="/brand/rush-chair.jpg" alt="Rush chair profile" /> : "JM"}</button></header>
     {screen === "feed" && <PnmFeed isRushChair={isRushChair} query={query} setQuery={setQuery} pnms={filtered} inviteList={inviteList} toggleInvite={toggleInvite} notes={notes} addNote={addNote} messagePnm={() => setScreen("messages")} />}
     {screen === "schedule" && <RushSchedule />}
     {screen === "chair" && isRushChair && <ChairControlCenter inviteList={inviteList} goToPnms={() => setScreen("feed")} />}
     {screen === "messages" && <ChairMessages goBack={() => setScreen(isRushChair ? "chair" : "feed")} />}
-    {screen === "profile" && <MemberProfile isRushChair={isRushChair} />}
+    {screen === "profile" && <MemberProfile isRushChair={isRushChair} profile={myProfile} />}
     {addingPnm && <AddPnm close={() => setAddingPnm(false)} add={(pnm) => { setPnmList([pnm, ...pnmList]); setAddingPnm(false); setScreen("feed"); }} />}
     <nav className="bottom-nav member-nav"><button className={screen === "feed" ? "nav-active" : ""} onClick={() => setScreen("feed")}><span>⌂</span>PNMs</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>Schedule</button><button className="scan" aria-label="Add PNM" onClick={() => setAddingPnm(true)}><span>＋</span></button>{isRushChair ? <button className={screen === "chair" ? "nav-active" : ""} onClick={() => setScreen("chair")}><span>✦</span>Chair tools</button> : <button><span>♧</span>Reminders</button>}<button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span>✉</span>Messages</button></nav>
   </main>;
@@ -67,7 +94,7 @@ export default function MemberPortal() {
 
 function ApprovalStatus({ chair }: { chair: boolean }) { const enterWorkspace = () => window.location.assign(`/member?chair=${chair ? "yes" : "no"}`); return <main className="cal-poly-app member-pending"><section className="gateway-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><p>ACTIVE MEMBER PROFILE</p></section><section className="gateway-card"><p className="eyebrow">REQUEST SUBMITTED</p><span className="verified-mark pending">◷</span><h1>Waiting for<br />approval.</h1><p className="gateway-copy">Your active-member profile is with your chapter’s rush chair. You’ll receive member access once they confirm you.</p><section className="approval-detail"><strong>{chair ? "Rush chair profile noted" : "Active member profile noted"}</strong><span>Cal Poly email verified</span></section><section className="demo-bypass"><p>DEMO MODE</p><strong>{chair ? "Skip chair verification" : "Skip member approval"}</strong><span>For prototype review only. This will be removed when real approvals are connected.</span><button onClick={enterWorkspace}>Enter {chair ? "rush chair" : "member"} workspace →</button></section></section></main>; }
 
-function MemberProfile({ isRushChair }: { isRushChair: boolean }) { return <div className="shell member-profile"><p className="eyebrow">{isRushChair ? "RUSH CHAIR PROFILE" : "ACTIVE MEMBER PROFILE"}</p>{isRushChair ? <><img className="chair-profile-photo" src="/brand/rush-chair.jpg" alt="Rush chair profile" /><h1>Miles Schulist</h1><p className="muted">Rush Chair · Delta Upsilon</p><section className="profile-detail"><strong>Available to PNMs</strong><span>Questions from PNMs will appear in your private messages.</span></section></> : <><div className="profile-placeholder member-profile-placeholder" /><h1>Active member</h1><p className="muted">Your profile details will be available here.</p></>}</div>; }
+function MemberProfile({ isRushChair, profile }: { isRushChair: boolean; profile: ProfileDto | null }) { return <div className="shell member-profile"><p className="eyebrow">{profile?.role.toUpperCase() ?? (isRushChair ? "RUSH CHAIR PROFILE" : "ACTIVE MEMBER PROFILE")}</p>{profile?.photo_url ? <img className="chair-profile-photo" src={profile.photo_url} alt="Profile" /> : <div className="profile-placeholder member-profile-placeholder" />}<h1>{profile?.full_name ?? (isRushChair ? "Rush chair" : "Active member")}</h1><p className="muted">{profile?.major || "Major not provided"}{profile?.hometown ? ` · ${profile.hometown}` : ""}</p>{profile && <><section className="profile-detail"><strong>Phone</strong><span>{profile.phone}</span></section><section className="profile-detail"><strong>Associated houses</strong><span>{profile.associated_houses.length ? profile.associated_houses.join(", ") : "None selected"}</span></section>{profile.funny_question_answer && <section className="profile-detail"><strong>{FUNNY_QUESTION_PROMPT}</strong><span>{profile.funny_question_answer}</span></section>}</>}</div>; }
 
 function PnmFeed({ isRushChair, query, setQuery, pnms: visiblePnms, inviteList, toggleInvite, notes, addNote, messagePnm }: { isRushChair: boolean; query: string; setQuery: (value: string) => void; pnms: Pnm[]; inviteList: string[]; toggleInvite: (id: string) => void; notes: Record<string, string[]>; addNote: (id: string, note: string) => void; messagePnm: () => void }) { return <div className="shell member-feed"><section className="member-hero"><p className="eyebrow">DELTA TAU DELTA · RUSH</p><h1>{isRushChair ? "View your\nPNMs." : "PNM profiles."}</h1></section><section className="reminder-card"><span>◷</span><div><strong>Rush schedule reminder</strong><p>Open House begins at 7:00 PM.</p></div><button>Set</button></section><div className="feed-search discreet"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search PNMs" /></div><section className="feed-label"><div><p className="eyebrow">PNM DIRECTORY</p><h2>{visiblePnms.length} profiles</h2></div>{isRushChair && <span>{inviteList.length} selected</span>}</section><section className="pnm-feed-list">{visiblePnms.map((pnm) => <PnmCard key={pnm.id} pnm={pnm} isRushChair={isRushChair} invited={inviteList.includes(pnm.id)} toggleInvite={toggleInvite} notes={notes[pnm.id] || []} addNote={addNote} messagePnm={messagePnm} />)}</section></div>; }
 

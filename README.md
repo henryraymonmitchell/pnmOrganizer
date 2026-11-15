@@ -13,16 +13,20 @@ npm install
 npm run dev
 ```
 
-After the server starts, open these local routes in the same browser/device running `npm run dev`:
+The root route opens the profile setup gateway. You can also open these routes directly in the same browser/device running `npm run dev`:
 
 - PNM portal: `http://localhost:3000/pnm`
 - Active-member workspace: `http://localhost:3000/member`
 
-The root route redirects to the PNM portal. These are local development URLs, so they do not work when clicked from GitHub unless the app is running on your computer.
+These are local development URLs, so they do not work when clicked from GitHub unless the app is running on your computer.
+
+Profile records are saved in `data/rush.sqlite`, and uploaded photos are stored in `data/profile-photos`. The app creates these paths as needed. Set `SQLITE_DB_PATH` to use a different SQLite file. Keep the data directory on persistent writable storage; serverless filesystems may not preserve it between deployments.
+
+See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile API fields and role/house rules.
 
 ## Deploy
 
-To make the app available from a public README link, deploy this Next.js project to Vercel, then replace the local URLs above with the deployed domain's `/pnm` and `/member` routes.
+To deploy the UI, use a host that provides persistent writable storage for the SQLite database and profile photos, then replace the local URLs above with the deployed domain's `/pnm` and `/member` routes.
 
 ## Production check
 
@@ -30,4 +34,4 @@ To make the app available from a public README link, deploy this Next.js project
 npm run build
 ```
 
-The current version is a polished UI prototype. Authentication, Supabase data policies, QR token validation, and SMS delivery are the next integration layer.
+The app is a prototype. Profile persistence uses local SQLite; identity and authorization, production storage, event/RSVP persistence, check-in validation, and messaging delivery remain future integration work.

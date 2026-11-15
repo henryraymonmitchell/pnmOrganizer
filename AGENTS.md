@@ -4,7 +4,7 @@
 
 - Rush is a mobile-first IFC recruitment hub prototype built with Next.js 14, React 18, and TypeScript.
 - It currently has two product areas: the PNM portal at `/pnm` and the active-member workspace at `/member`. The root route redirects to `/pnm`.
-- The current product is a UI prototype. Treat authentication, Supabase policies, QR validation, and SMS delivery as future integration work unless the task explicitly asks for them.
+- The current product is a UI prototype with local SQLite profile persistence. Treat real authentication/authorization, production storage, QR validation, and message delivery as future integration work unless the task explicitly asks for them.
 
 ## Development
 
@@ -32,34 +32,33 @@
 
 ## Henry's Backend Work Plan
 
-The app currently has no connected backend; records and interactions are still hard-coded or held in client state in `app/pnm/page.tsx` and `app/member/page.tsx`. Supabase has been selected. Work in this order, updating status here as decisions are made and tasks are completed:
+The prototype now persists profiles in a local SQLite database. Events, messages, and other recruitment workflows are still mock/client state. Continue in this order, updating status here as decisions are made and tasks are completed:
 
 1. **Confirm requirements and constraints.** Use Dean's research to define the rush lifecycle, entities, user types, privacy/consent needs, and who can see or change each record. Record open questions instead of baking guesses into the schema.
-2. **Set up Supabase workflow.** Use the Supabase CLI local stack and versioned SQL migrations. Keep environment strategy and secrets separate before connecting production data.
+2. **Maintain the SQLite profile store.** Keep profile persistence server-side, keep the database file out of Git, and record schema changes. Add versioned migrations as the schema grows beyond its initial profile tables.
 3. **Define domain model and access rules.** Draft the model for users, chapters, events, invitations, RSVPs, attendance/check-ins, and member shortlists. Define role and chapter boundaries, validation, retention, and audit needs with research input.
 4. **Publish integration contracts.** Specify read/write operations and TypeScript shapes for PNM dashboard, event RSVP, member attendee list, invitation review, and check-in. Agree these with Miles before implementing UI-dependent endpoints.
-5. **Implement the smallest vertical slice.** Start with safe configuration and schema/migrations, then a read path for events/invitations and an RSVP write path. Replace sample records only once the contract is agreed; keep a documented demo/seed path for local UI work.
+5. **Implement the next vertical slice.** Add new datasets only after their contracts and access rules are agreed. Keep a documented demo path for local UI work.
 6. **Add identity and authorization.** Implement authentication and server-side role/chapter authorization before exposing real PNM or member data. Do not treat client-side visibility as access control.
 7. **Add operational flows.** Implement check-in token issuance/validation, invitation review, and any messaging integration only after workflow and abuse/privacy requirements are confirmed. Keep secrets server-side and make sensitive actions auditable.
 8. **Harden and hand off.** Document environment variables, migrations, local setup, error behavior, and deployment steps. Verify only when requested, and update this guide and `journal.md` with completed decisions and milestones.
 
 ### Current Backend Status
 
-- Backend implementation: Supabase chapter reads are connected. PNM onboarding now uses phone OTP, private photo upload, and profile upsert; profile/photo policies are in `supabase/migrations/202611140002_profile_access.sql` and must be applied to the hosted project.
-- Backend provider: Supabase (Postgres; Auth and Storage as needed).
-- The Supabase JS client is configured in `lib/supabase/client.ts` and reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Copy `.env.example` to `.env.local` and fill in the Supabase project's URL and publishable key. Never put service-role or secret keys in `NEXT_PUBLIC_*` variables or browser code.
-- Auth model, schema details, and API contracts: still to be defined with research and frontend input.
-- Use Supabase CLI local development and commit SQL migrations under `supabase/migrations`; do not make untracked production schema edits in the dashboard. Keep local/dev/staging/production environments and secrets separate.
-- Row Level Security is enabled on every application table. Only active chapter rows have an initial public read policy; participant, event, RSVP, invitation, attendance, and shortlist data remain inaccessible to client roles until role-aware policies are designed.
-- The recognized chapter seed data lives in `supabase/seed.sql`; it was applied to the hosted Supabase project. The PNM directory reads active chapter rows through the public policy and falls back to its local demo list if the request fails. Events and PNM state are still mock/client state.
-- Phone OTP requires an SMS provider to be configured in Supabase Auth. Profile photos use a private `profile-photos` bucket and short-lived signed URLs.
-- Next action: set up the Supabase CLI/local stack and then define authorized event reads and PNM schedule persistence; add policies only after review with Dean and Miles.
+- Profile records are stored in `data/rush.sqlite`; photos are stored under `data/profile-photos`. Both are ignored by Git. Set `SQLITE_DB_PATH` to choose another database file.
+- The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, Rush Chair and Active Member profiles require one, and PNM profiles may select any number.
+- `GET`, `POST`, and `PATCH /api/profile` read and write the current browser profile. The `rush_profile_id` HttpOnly cookie identifies a local prototype profile; it is not authentication or authorization.
+- The rush-chair funny-question prompt is configured in `lib/profile-domain.ts`. The profile stores the user's optional answer.
+- Existing Supabase client use remains for optional phone OTP, chapter reads, and the member PNM directory. Profile persistence and photos use SQLite/local disk instead of Supabase tables and Storage.
+- The Supabase browser client reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put service-role or secret keys in `NEXT_PUBLIC_*` variables or browser code.
+- SQLite files and photos require persistent writable disk. Do not rely on ephemeral serverless storage for durable profile data, and do not expose this prototype's profile API as production data without identity and authorization.
+- Next action: confirm the remaining recruitment workflow and privacy requirements before adding events, RSVPs, invitations, attendance, or messaging datasets.
 
 ### Draft Relational Schema (For Discussion)
 
-Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and explicit status fields. Treat this as a starting model, not an approved migration. Normalize chapter/event data instead of duplicating it in each PNM's records.
+This is a discussion draft for a future auth-backed system, not the current SQLite profile schema or an approved migration. Use UUID primary keys, `created_at` / `updated_at` timestamps, foreign keys, and explicit status fields. Normalize chapter/event data instead of duplicating it in each PNM's records.
 
-- `profiles`: one row per authenticated user; auth provider user ID, full name, phone, photo storage key, hometown, and major. Name, phone, and photo are required; hometown and major are optional. Store phones as text in normalized international format (for example `+13428765643`) and photos as Supabase Storage object paths, not local filesystem paths. Keep credentials in the auth provider, not this table.
+- `profiles`: one row per authenticated user; auth provider user ID, full name, phone, photo storage key, hometown, and major. Name and phone are required; hometown and major are optional. Store phones as text in normalized international format (for example `+13428765643`). A hosted version should store a storage object key; the current local SQLite prototype stores a relative photo path. Keep credentials in the auth provider, not this table.
 - `chapter_memberships`: user-to-chapter relationship with role (`pnm`, `member`, `chapter_admin`, `ifc_admin`) and status. For PNMs, rows represent the houses they associate with; IFC Admin access across all chapters is handled by role/policy rather than duplicating a row per house. Chapter-scoped access must be enforced by server/database policy.
 - `chapters`: IFC-recognized organizations; official name, short name, branding colors, active status. Confirm authoritative source and whether chapters have a campus/organization parent.
 - `rush_cycles`: a defined recruitment period (term/year, start/end dates, status). Scope events and policies to a cycle so future rush periods do not overwrite historical data.
