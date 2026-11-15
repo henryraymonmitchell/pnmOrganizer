@@ -95,3 +95,7 @@ we'll update this journal every time we make a milestone or do something
 - Added the 20 sample PNM records and portrait files to tracked `demo-data/` assets so a fresh clone can reproduce the pitch data.
 - Added the TypeScript `npm run seed:demo` utility to copy portraits into local storage and add profiles, progress history, and event data without deleting existing profiles.
 - Kept SQLite databases ignored and documented the seed workflow for collaborators.
+
+## 2026-11-15 — Invitation review list
+- Connected rush-chair invite selections to the invitation review screen, displaying selected PNM names, photos, and profile details before sending.
+- Added per-PNM removal controls so a rush chair can refine the invite list without returning to the directory.
