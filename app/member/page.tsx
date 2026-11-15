@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
 type Pnm = { id: string; name: string; major: string; year: string; hometown: string; attended: string; tags: string[]; image: string };
 
@@ -21,6 +22,32 @@ export default function MemberPortal() {
   const [inviteList, setInviteList] = useState<string[]>([]);
   const [notes, setNotes] = useState<Record<string, string[]>>({});
   useEffect(() => { const params = new URLSearchParams(window.location.search); const chair = params.get("chair"); setApproval(params.get("approval")); setChairSetting(chair); if (chair === "yes" && params.get("approval") !== "pending") setScreen("chair"); }, []);
+  useEffect(() => {
+    let active = true;
+    async function loadPnmDirectory() {
+      if (!isSupabaseConfigured) return;
+      const { data, error } = await supabase.from("pnm_directory").select("id, full_name, hometown, major, photo_path").order("full_name");
+      if (!active || error || !data) return;
+      const directory = await Promise.all(data.map(async (pnm) => {
+        const { data: signedPhoto } = pnm.photo_path
+          ? await supabase.storage.from("profile-photos").createSignedUrl(pnm.photo_path, 60 * 60)
+          : { data: null };
+        return {
+          id: pnm.id,
+          name: pnm.full_name,
+          major: pnm.major || "Not provided",
+          year: "PNM",
+          hometown: pnm.hometown || "Not provided",
+          attended: "",
+          tags: [],
+          image: signedPhoto?.signedUrl || "",
+        };
+      }));
+      if (active) setPnmList(directory);
+    }
+    void loadPnmDirectory();
+    return () => { active = false; };
+  }, []);
   const isRushChair = chairSetting === "yes";
   const filtered = useMemo(() => pnmList.filter((pnm) => `${pnm.name} ${pnm.major} ${pnm.year} ${pnm.hometown} ${pnm.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase())), [query, pnmList]);
   const toggleInvite = (id: string) => setInviteList((current) => current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]);

@@ -46,3 +46,11 @@ we'll update this journal every time we make a milestone or do something
 - Added Supabase phone OTP verification to onboarding, private profile photo upload, and profile upsert/reload.
 - Added a follow-up migration with own-profile RLS policies and private Storage bucket policies. Hosted migration application and SMS provider configuration are still required before the flow can work end to end.
 - Added optional hometown and major profile columns, a rush-cycle question prompt, and an optional PNM answer on the cycle registration. Chapter associations are represented through `chapter_memberships`.
+
+## 2026-11-14 — Notification client foundation
+- Added a PNM Profile opt-in for browser notifications and registered a same-origin service worker to receive Web Push payloads and open the linked portal view.
+- Documented the backend contract for protected device subscriptions, VAPID/Edge Function delivery, and Supabase Realtime updates. Backend tables, policies, and sender credentials remain pending backend-owner implementation.
+
+## 2026-11-14 — PNM directory contract
+- Added a migration that registers authenticated PNM profiles in a restricted directory view for active members.
+- The directory exposes only name, hometown, major, and profile photo path; it does not expose PNM phone numbers. Active-member access and PNM photo access are guarded by membership-based policies.

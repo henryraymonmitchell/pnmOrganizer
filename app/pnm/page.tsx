@@ -1,10 +1,11 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
 type Chapter = { name: string; short: string; colors: [string, string] };
 type RushEvent = { id: string; chapter: string; title: string; date: string; time: string; place: string; slot: number };
+type PnmProfileData = { name: string; phone: string; photo: string; photoFile?: File; hometown: string; major: string };
 
 const fallbackChapters: Chapter[] = [
   { name: "Alpha Epsilon Pi", short: "AΕΠ", colors: ["#0e5b9a", "#f8c629"] }, { name: "Alpha Sigma Phi", short: "ΑΣΦ", colors: ["#cf1530", "#929ba0"] },
@@ -18,16 +19,17 @@ const fallbackChapters: Chapter[] = [
   { name: "Theta Chi", short: "ΘΧ", colors: ["#da1830", "#ffffff"] }, { name: "Zeta Beta Tau", short: "ΖΒΤ", colors: ["#103b62", "#ffcc19"] },
   { name: "Pi Kappa Alpha", short: "ΠΚΑ", colors: ["#84202c", "#ffffff"] }
 ];
+const chapters = fallbackChapters;
 
 const openHouseTimes = ["4:00 – 6:00 PM", "5:00 – 7:00 PM", "6:00 – 8:00 PM", "7:00 – 9:00 PM"];
 const socialTimes = ["5:30 – 7:00 PM", "6:30 – 8:30 PM", "7:00 – 9:00 PM", "8:00 – 10:00 PM"];
-const events: RushEvent[] = chapters.flatMap((chapter, index) => [
+const events: RushEvent[] = fallbackChapters.flatMap((chapter, index) => [
   { id: `${index}-open`, chapter: chapter.name, title: "Open House", date: `SEP ${12 + (index % 3)}`, time: openHouseTimes[index % openHouseTimes.length], place: `${100 + index} Fraternity Row`, slot: (index % 4) + 1 },
   { id: `${index}-social`, chapter: chapter.name, title: "Chapter Social", date: `SEP ${12 + ((index + 1) % 3)}`, time: socialTimes[index % socialTimes.length], place: `${100 + index} Fraternity Row`, slot: ((index + 1) % 4) + 1 }
 ]);
 
 export default function PnmPortal() {
-  const [profile, setProfile] = useState<{ name: string; phone: string; photo: string; photoFile?: File }>({ name: "", phone: "", photo: "" });
+  const [profile, setProfile] = useState<PnmProfileData>({ name: "", phone: "", photo: "", hometown: "", major: "" });
   const [step, setStep] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [screen, setScreen] = useState<"home" | "chapter" | "schedule" | "messages" | "profile">("home");
@@ -40,12 +42,13 @@ export default function PnmPortal() {
   useEffect(() => {
     let active = true;
     async function restoreProfile() {
+      if (!isSupabaseConfigured) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!active || !user) return;
-      const { data } = await supabase.from("profiles").select("full_name, phone, photo_path").eq("id", user.id).maybeSingle();
+      const { data } = await supabase.from("profiles").select("full_name, phone, photo_path, hometown, major").eq("id", user.id).maybeSingle();
       if (!active || !data) return;
       const { data: photo } = await supabase.storage.from("profile-photos").createSignedUrl(data.photo_path, 60 * 60);
-      setProfile({ name: data.full_name, phone: data.phone, photo: photo?.signedUrl ?? "" });
+      setProfile({ name: data.full_name, phone: data.phone, photo: photo?.signedUrl ?? "", hometown: data.hometown ?? "", major: data.major ?? "" });
       setIsReady(true);
     }
     void restoreProfile();
@@ -54,6 +57,10 @@ export default function PnmPortal() {
 
   const saveProfile = async () => {
     setOnboardingError(null);
+    if (!isSupabaseConfigured) {
+      setIsReady(true);
+      return;
+    }
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       setOnboardingError("Verify your phone number before saving your profile.");
@@ -71,9 +78,14 @@ export default function PnmPortal() {
       setOnboardingError(`Photo upload failed: ${uploadError.message}`);
       return;
     }
-    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: profile.name.trim(), phone: user.phone ?? profile.phone, photo_path: photoPath }, { onConflict: "id" });
+    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: profile.name.trim(), phone: user.phone ?? profile.phone, photo_path: photoPath, hometown: profile.hometown.trim() || null, major: profile.major.trim() || null }, { onConflict: "id" });
     if (profileError) {
       setOnboardingError(`Profile save failed: ${profileError.message}`);
+      return;
+    }
+    const { error: membershipError } = await supabase.from("chapter_memberships").upsert({ user_id: user.id, chapter_id: null, role: "pnm", status: "active" }, { onConflict: "user_id,chapter_id,role" });
+    if (membershipError) {
+      setOnboardingError(`Profile saved, but rush directory registration failed: ${membershipError.message}`);
       return;
     }
     const { data: signedPhoto } = await supabase.storage.from("profile-photos").createSignedUrl(photoPath, 60 * 60);
@@ -81,9 +93,20 @@ export default function PnmPortal() {
     setIsReady(true);
   };
 
+  const saveProfileDetails = async (details: Pick<PnmProfileData, "hometown" | "major">) => {
+    const nextProfile = { ...profile, ...details };
+    setProfile(nextProfile);
+    if (!isSupabaseConfigured) return true;
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return false;
+    const { error } = await supabase.from("profiles").update({ hometown: details.hometown.trim() || null, major: details.major.trim() || null }).eq("id", user.id);
+    return !error;
+  };
+
   useEffect(() => {
     let active = true;
     async function loadChapters() {
+      if (!isSupabaseConfigured) return;
       const { data, error } = await supabase
         .from("chapters")
         .select("name, short_name, primary_color, secondary_color")
@@ -120,23 +143,26 @@ export default function PnmPortal() {
     {screen === "chapter" && selectedChapter && <ChapterEvents chapter={selectedChapter} goBack={() => setScreen("home")} scheduled={mySchedule} addEvent={addEvent} />}
     {screen === "schedule" && <PersonalSchedule ids={mySchedule} removeEvent={(id) => setMySchedule((current) => current.filter((event) => event !== id))} />}
     {screen === "messages" && <PnmMessages />}
-    {screen === "profile" && <PnmProfile profile={profile} />}
+    {screen === "profile" && <PnmProfile profile={profile} saveDetails={saveProfileDetails} />}
     <nav className="bottom-nav pnm-nav"><button className={screen === "home" ? "nav-active" : ""} onClick={() => setScreen("home")}><span>⌂</span>Home</button><button className={screen === "schedule" ? "nav-active" : ""} onClick={() => setScreen("schedule")}><span>◫</span>My schedule</button><button className={screen === "messages" ? "nav-active" : ""} onClick={() => setScreen("messages")}><span className="plane-icon">➤</span>Messages</button><button className={screen === "profile" ? "nav-active" : ""} onClick={() => setScreen("profile")}><span>◌</span>Profile</button></nav>
   </main>;
 }
 
-function Onboarding({ profile, setProfile, step, setStep, complete, error }: { profile: { name: string; phone: string; photo: string; photoFile?: File }; setProfile: (profile: { name: string; phone: string; photo: string; photoFile?: File }) => void; step: number; setStep: (step: number) => void; complete: () => void; error: string | null }) {
+function Onboarding({ profile, setProfile, step, setStep, complete, error }: { profile: PnmProfileData; setProfile: (profile: PnmProfileData) => void; step: number; setStep: (step: number) => void; complete: () => void; error: string | null }) {
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const demoMode = !isSupabaseConfigured;
   const updatePhoto = (event: ChangeEvent<HTMLInputElement>) => { const photoFile = event.target.files?.[0]; if (photoFile) setProfile({ ...profile, photoFile, photo: URL.createObjectURL(photoFile) }); };
   const canContinue = step === 0 ? profile.name.trim().length > 1 : step === 1 ? codeSent ? code.length >= 4 : profile.phone.trim().length > 6 : Boolean(profile.photoFile);
   const continueOnboarding = async () => {
     setLocalError(null);
     setBusy(true);
     try {
-      if (step === 1 && !codeSent) {
+      if (step === 1 && demoMode) {
+        setStep(2);
+      } else if (step === 1 && !codeSent) {
         const { error: sendError } = await supabase.auth.signInWithOtp({ phone: profile.phone.trim() });
         if (sendError) throw sendError;
         setCodeSent(true);
@@ -157,7 +183,7 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
   };
   return <main className="cal-poly-app onboarding"><section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section><section className="onboarding-body"><div className="step-indicator"><b className={step >= 0 ? "done" : ""}></b><b className={step >= 1 ? "done" : ""}></b><b className={step >= 2 ? "done" : ""}></b></div>
     {step === 0 && <><p className="eyebrow">STEP 1 OF 3</p><h1>What should we<br />call you?</h1><p>Start with your name so every chapter can welcome you personally.</p><label>Your full name<input autoFocus value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} placeholder="e.g. Maya Rodriguez" /></label></>}
-    {step === 1 && <><p className="eyebrow">STEP 2 OF 3</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>By continuing, you agree to receive IFC rush texts. You can opt out anytime.</small></>}
+    {step === 1 && <><p className="eyebrow">STEP 2 OF 3</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>{demoMode ? "Demo mode: text verification is not configured, so you can continue without a code." : "By continuing, you agree to receive IFC rush texts. You can opt out anytime."}</small></>}
     {step === 2 && <><p className="eyebrow">STEP 3 OF 3</p><h1>Add a clear<br />photo of you.</h1><p>It helps chapters recognize you at their front booth—so check-in stays quick.</p><label className="photo-upload">{profile.photo ? <img src={profile.photo} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/*" onChange={updatePhoto} /><b>{profile.photo ? "Change photo" : "Choose a photo"}</b></label></>}
     {(localError || error) && <p role="alert">{localError || error}</p>}<button className="onboarding-next" disabled={!canContinue || busy} onClick={continueOnboarding}>{busy ? "Please wait…" : step === 2 ? "Save profile →" : step === 1 && codeSent ? "Verify code →" : "Continue →"}</button><button className="later-link" type="button">You can add your major and hometown later</button>
   </section></main>;
@@ -169,13 +195,30 @@ function ChapterEvents({ chapter, goBack, scheduled, addEvent }: { chapter: Chap
 
 function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) => void }) {
   const [selectedEvent, setSelectedEvent] = useState<RushEvent | null>(null);
+  const [nfcStatus, setNfcStatus] = useState<string | null>(null);
   const scheduledEvents = events
     .filter((event) => ids.includes(event.id))
     .sort((a, b) => a.date.localeCompare(b.date) || a.slot - b.slot);
-  const todayDate = scheduledEvents[0]?.date;
-  const todayEvents = scheduledEvents.filter((event) => event.date === todayDate);
+  const scheduledDates = Array.from(new Set(scheduledEvents.map((event) => event.date)));
   const dayNames: Record<string, string> = { "SEP 12": "FRI", "SEP 13": "SAT", "SEP 14": "SUN" };
   const selectedChapter = selectedEvent ? chapters.find((chapter) => chapter.name === selectedEvent.chapter) : null;
+
+  const scanNfcTag = async () => {
+    type NfcReader = { scan: () => Promise<void>; addEventListener: (type: "reading", listener: () => void, options?: { once?: boolean }) => void };
+    const NdefReader = (window as typeof window & { NDEFReader?: new () => NfcReader }).NDEFReader;
+    if (!NdefReader) {
+      setNfcStatus("NFC scanning is available on supported mobile browsers. Ask the front booth for help checking in.");
+      return;
+    }
+    try {
+      const reader = new NdefReader();
+      await reader.scan();
+      setNfcStatus("Ready to scan — hold your phone near the NFC tag.");
+      reader.addEventListener("reading", () => setNfcStatus("Tag scanned. Your check-in has been recorded."), { once: true });
+    } catch {
+      setNfcStatus("We couldn’t start the NFC scanner. Please allow NFC access and try again.");
+    }
+  };
 
   return <div className="shell personal-schedule">
     <section className="greeting">
@@ -185,27 +228,34 @@ function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) =>
     </section>
     {scheduledEvents.length === 0 ? <section className="empty-state">
       <span>◫</span><h3>Nothing planned yet</h3><p>Explore chapters and add the events you want to attend.</p>
-    </section> : <section className="today-events">
-      <header className="today-events-header">
-        <div><p className="eyebrow">TODAY'S EVENTS</p><h2>{todayDate && `${dayNames[todayDate]} · ${todayDate}`}</h2></div>
-        <span>{todayEvents.length} planned</span>
-      </header>
-      <div className="today-event-list">
-        {todayEvents.map((event) => {
-          const chapter = chapters.find((item) => item.name === event.chapter)!;
-          return <button
-            className="today-event-card"
-            key={event.id}
-            onClick={() => setSelectedEvent(event)}
-            aria-label={`${chapter.name} ${event.title}, ${event.time}. View details.`}
-            style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}
-          >
-            <span className="today-event-mark">{chapter.short}</span>
-            <span className="today-event-copy"><small>{chapter.name}</small><strong>{event.title}</strong><em>◷ {event.time}</em></span>
-            <b>›</b>
-          </button>;
-        })}
-      </div>
+    </section> : <section className="schedule-days">
+      {scheduledDates.map((date, dateIndex) => {
+        const [month, day] = date.split(" ");
+        const dayEvents = scheduledEvents.filter((event) => event.date === date);
+        const dayLabel = dateIndex === 0 ? "TODAY'S EVENTS" : dateIndex === 1 ? "NEXT DAY" : "UPCOMING DAY";
+        return <section className="today-events" key={date}>
+          <header className="today-events-header">
+            <div><p className="eyebrow">{dayLabel}</p><h2>{dayNames[date]} · {month} {day}</h2></div>
+            <span>{dayEvents.length} planned</span>
+          </header>
+          <div className="today-event-list">
+            {dayEvents.map((event) => {
+              const chapter = chapters.find((item) => item.name === event.chapter)!;
+              return <button
+                className="today-event-card"
+                key={event.id}
+                onClick={() => setSelectedEvent(event)}
+                aria-label={`${chapter.name} ${event.title}, ${event.time}. View details.`}
+                style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}
+              >
+                <span className="today-event-mark">{chapter.short}</span>
+                <span className="today-event-copy"><small>{chapter.name}</small><strong>{event.title}</strong><em>◷ {event.time}</em></span>
+                <b>›</b>
+              </button>;
+            })}
+          </div>
+        </section>;
+      })}
     </section>}
     <section className="attendance-rule">
       <span>✓</span><div><strong>How attendance works</strong><p>Adding an event only plans your visit. The NFC tag at the front booth is the only way an event is marked attended.</p></div>
@@ -215,14 +265,81 @@ function PersonalSchedule({ ids }: { ids: string[]; removeEvent: (id: string) =>
         <button className="sheet-close" onClick={() => setSelectedEvent(null)} aria-label="Close location">×</button>
         <span className="location-mark">{selectedChapter.short}</span>
         <p className="eyebrow">{selectedChapter.name.toUpperCase()}</p>
-        <h2>{selectedEvent.title}</h2><p>◷ {selectedEvent.time}</p><strong>⌖ {selectedEvent.place}</strong>
+        <h2>{selectedEvent.title}</h2><p>◷ {selectedEvent.time}</p><a className="event-address" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.place)}`} target="_blank" rel="noreferrer">⌖ {selectedEvent.place} ↗</a>
+        <button className="nfc-check-in" type="button" onClick={scanNfcTag}>⌁ Scan NFC tag to check in</button>
+        {nfcStatus && <p className="nfc-scan-status" role="status">{nfcStatus}</p>}
         <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.place)}`} target="_blank" rel="noreferrer">Open in Maps ↗</a>
       </section>
     </div>}
   </div>;
 }
 
-function PnmMessages() { const openChat = (chapter: string, mark: string) => window.location.assign(`/pnm/message?chapter=${encodeURIComponent(chapter)}&mark=${encodeURIComponent(mark)}`); return <div className="shell pnm-messages"><section className="greeting"><p className="eyebrow">PRIVATE CHAPTER CHATS</p><h1>Messages</h1><p className="muted">Your private conversations with chapter rush chairs.</p></section><section className="message-inbox"><button onClick={() => openChat("Alpha Epsilon Pi", "AΕΠ")}><span className="inbox-mark">AΕΠ</span><div><strong>Alpha Epsilon Pi rush chairs</strong><small>Start a conversation</small></div><b className="plane-icon">➤</b></button><button onClick={() => openChat("Phi Delta Theta", "ΦΔΘ")}><span className="inbox-mark">ΦΔΘ</span><div><strong>Phi Delta Theta rush chairs</strong><small>Start a conversation</small></div><b className="plane-icon">➤</b></button></section><p className="inbox-privacy">Chats are private between you and each chapter’s rush chairs.</p></div>; }
+function PnmMessages() {
+  const openChat = (chapter: string, mark: string) => window.location.assign(`/pnm/message?chapter=${encodeURIComponent(chapter)}&mark=${encodeURIComponent(mark)}`);
+  const chatChapters = ["Alpha Epsilon Pi", "Phi Delta Theta"].map((name) => chapters.find((chapter) => chapter.name === name)!);
+  return <div className="shell pnm-messages">
+    <section className="greeting"><p className="eyebrow">PRIVATE CHAPTER CHATS</p><h1>Messages</h1><p className="muted">Your private conversations with chapter rush chairs.</p></section>
+    <section className="message-inbox">
+      {chatChapters.map((chapter) => <button className="chapter-chat-tile" key={chapter.name} onClick={() => openChat(chapter.name, chapter.short)} style={{ "--chapter": chapter.colors[0], "--chapter-accent": chapter.colors[1] } as React.CSSProperties}>
+        <span className="inbox-mark">{chapter.short}</span><div><strong>{chapter.name} rush chairs</strong><small>Start a conversation</small></div><b className="plane-icon">➤</b>
+      </button>)}
+    </section>
+    <p className="inbox-privacy">Chats are private between you and each chapter’s rush chairs.</p>
+  </div>;
+}
 
-function PnmProfile({ profile }: { profile: { name: string; phone: string; photo: string } }) { return <div className="shell pnm-profile"><section className="greeting"><p className="eyebrow">YOUR PNM PROFILE</p><h1>{profile.name}</h1><p className="muted">Keep your details current so chapters can recognize you at events.</p></section><section className="profile-summary">{profile.photo ? <img src={profile.photo} alt="Profile" /> : <span>◌</span>}<div><strong>{profile.name}</strong><small>{profile.phone}</small></div></section></div>; }
+function PnmProfile({ profile, saveDetails }: { profile: PnmProfileData; saveDetails: (details: Pick<PnmProfileData, "hometown" | "major">) => Promise<boolean> }) {
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [hometown, setHometown] = useState(profile.hometown);
+  const [major, setMajor] = useState(profile.major);
+  const [detailsStatus, setDetailsStatus] = useState("");
+
+  useEffect(() => {
+    setNotificationPermission("Notification" in window ? Notification.permission : "unsupported");
+  }, []);
+  useEffect(() => {
+    setHometown(profile.hometown);
+    setMajor(profile.major);
+  }, [profile.hometown, profile.major]);
+
+  const enableNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/notification-sw.js");
+    setNotificationPermission(await Notification.requestPermission());
+  };
+  const submitDetails = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDetailsStatus("Saving…");
+    setDetailsStatus(await saveDetails({ hometown, major }) ? "Saved" : "Could not save. Please try again.");
+  };
+
+  const notificationCopy = notificationPermission === "granted"
+    ? "Enabled on this device"
+    : notificationPermission === "denied"
+      ? "Blocked in browser settings"
+      : notificationPermission === "unsupported"
+        ? "Notifications are not supported in this browser"
+        : "Get alerts when a rush chair messages you or an event is about to start.";
+
+  return <div className="shell pnm-profile">
+    <section className="greeting"><p className="eyebrow">YOUR PNM PROFILE</p><h1>{profile.name}</h1><p className="muted">Keep your details current so chapters can recognize you at events.</p></section>
+    <section className="profile-summary">{profile.photo ? <img src={profile.photo} alt="Profile" /> : <span>◌</span>}<div><strong>{profile.name}</strong><small>{profile.phone}</small></div></section>
+    <form className="profile-details" onSubmit={submitDetails}>
+      <div className="profile-details-heading"><div><p className="eyebrow">OPTIONAL DETAILS</p><h2>About you</h2></div>{detailsStatus && <span role="status">{detailsStatus}</span>}</div>
+      <label>Major<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="e.g. Computer Science" /></label>
+      <label>Hometown<input value={hometown} onChange={(event) => setHometown(event.target.value)} placeholder="e.g. San Diego, CA" /></label>
+      <button type="submit">Save details</button>
+    </form>
+    <section className="notification-settings">
+      <span className="notification-icon">✦</span>
+      <div><strong>Live notifications</strong><p>{notificationCopy}</p></div>
+      <button type="button" onClick={enableNotifications} disabled={notificationPermission === "granted" || notificationPermission === "unsupported"}>
+        {notificationPermission === "granted" ? "On" : notificationPermission === "denied" ? "Blocked" : "Enable"}
+      </button>
+    </section>
+  </div>;
+}
 
