@@ -115,6 +115,7 @@ export default function ProfileSetup() {
   };
 
   const associatedHouses = role === "IFC Admin" ? "All recognized houses" : chapter || "Not provided";
+  const chapterRequired = role === "Rush Chair" || role === "Active Member";
 
   return <main className="cal-poly-app onboarding">
     <section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section>
@@ -128,7 +129,7 @@ export default function ProfileSetup() {
         <label>Hometown <span>(optional)</span><input value={form.hometown} onChange={(event) => setForm({ ...form, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label>
         <label>Major <span>(optional)</span><input value={form.major} onChange={(event) => setForm({ ...form, major: event.target.value })} placeholder="e.g. Computer Science" /></label>
         <label>{FUNNY_QUESTION_PROMPT} <span>(optional)</span><textarea rows={3} value={form.funnyQuestionAnswer} onChange={(event) => setForm({ ...form, funnyQuestionAnswer: event.target.value })} /></label>
-        {role !== "IFC Admin" && <label>Your chapter <span>(optional)</span><select value={chapter} onChange={(event) => setChapter(event.target.value)}><option value="">Choose later</option>{chapterNames.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>}
+        {role !== "IFC Admin" && <label>Your chapter {!chapterRequired && <span>(optional)</span>}<select required={chapterRequired} value={chapter} onChange={(event) => setChapter(event.target.value)}><option value="">{chapterRequired ? "Choose your chapter" : "Choose later"}</option>{chapterNames.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>}
         <section className="directory-note"><strong>Associated houses <span>(optional)</span></strong><p>{associatedHouses}</p></section>
         <label className="photo-upload">{photoPreview ? <img src={photoPreview} alt="Profile preview" /> : <span>＋</span>}<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{photoPreview ? "Change photo" : "Add a photo"}</b></label>
         {error && <p role="alert">{error}</p>}

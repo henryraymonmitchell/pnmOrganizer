@@ -59,6 +59,9 @@ function parseHouses(value: FormDataEntryValue | null, role: ProfileRole) {
   if (houses.some((house) => !validHouseNames.has(house))) {
     throw new ProfileValidationError("Choose houses from the recognized chapter list.");
   }
+  if ((role === "Rush Chair" || role === "Active Member") && houses.length !== 1) {
+    throw new ProfileValidationError(`${role} profiles must select exactly one chapter.`);
+  }
   return houses;
 }
 
@@ -141,7 +144,7 @@ async function saveFromRequest(request: NextRequest, requireExisting: boolean) {
 
     const id = prior?.id ?? randomUUID();
     const input = await parseProfile(request, id, prior);
-    const profile = saveProfile(input);
+    const profile = saveProfile(input, input.role === "PNM" ? input.id : null);
     return withProfileCookie(NextResponse.json(profileDto(profile), { status: prior ? 200 : 201 }), id);
   } catch (error) {
     if (error instanceof ProfileValidationError) {
@@ -157,4 +160,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   return saveFromRequest(request, true);
+}
+
+export async function DELETE() {
+  const response = NextResponse.json({ signed_out: true });
+  response.cookies.set(PROFILE_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

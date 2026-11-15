@@ -20,9 +20,11 @@ The root route opens the profile setup gateway. You can also open these routes d
 
 These are local development URLs, so they do not work when clicked from GitHub unless the app is running on your computer.
 
-Profile records are saved in `data/rush.sqlite`, and uploaded photos are stored in `data/profile-photos`. The app creates these paths as needed. Set `SQLITE_DB_PATH` to use a different SQLite file. Keep the data directory on persistent writable storage; serverless filesystems may not preserve it between deployments.
+Recognized chapter names, profiles, chapter progress, events, and event sign-ups are saved in `data/rush.sqlite`; uploaded photos are stored in `data/profile-photos`. The app creates these paths as needed and applies versioned SQLite migrations at startup. Set `SQLITE_DB_PATH` to use a different database file, or `RUSH_CYCLE_NAME` to name the active rush cycle. The first database startup seeds one demo open-invite event for each recognized chapter. Keep the data directory on persistent writable storage; serverless filesystems may not preserve it between deployments.
 
-See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile API fields and role/house rules.
+Rush chairs can add PNM profiles from the member workspace. Selecting a chapter in the PNM portal associates that chapter with the PNM and creates `open invite` progress for the active cycle. Event sign-ups, chair progress changes, and chapter events persist across browser sessions. Use **Switch profile** in the profile tab to sign out of the current demo profile while keeping its database record.
+
+See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile, event, and progress API contracts.
 
 ## Deploy
 
@@ -34,4 +36,4 @@ To deploy the UI, use a host that provides persistent writable storage for the S
 npm run build
 ```
 
-The app is a prototype. Profile persistence uses local SQLite; identity and authorization, production storage, event/RSVP persistence, check-in validation, and messaging delivery remain future integration work.
+The app is a prototype. SQLite persistence is local to the host. The profile cookie is a demo identity token, and production authentication/authorization, photo storage, check-in validation, and messaging delivery remain future integration work.

@@ -32,13 +32,13 @@
 
 ## Henry's Backend Work Plan
 
-The prototype now persists profiles in a local SQLite database. Events, messages, and other recruitment workflows are still mock/client state. Continue in this order, updating status here as decisions are made and tasks are completed:
+The prototype persists profiles, chapter progress, events, and event sign-ups in a local SQLite database. Messages and other recruitment workflows remain mock/client state. Continue in this order, updating status here as decisions are made and tasks are completed:
 
 1. **Confirm requirements and constraints.** Use Dean's research to define the rush lifecycle, entities, user types, privacy/consent needs, and who can see or change each record. Record open questions instead of baking guesses into the schema.
-2. **Maintain the SQLite profile store.** Keep profile persistence server-side, keep the database file out of Git, and record schema changes. Add versioned migrations as the schema grows beyond its initial profile tables.
+2. **Maintain the SQLite store.** Keep persistence server-side, keep the database file out of Git, and record schema changes in versioned migrations under `lib/server/sqlite-migrations.ts`.
 3. **Define domain model and access rules.** Draft the model for users, chapters, events, invitations, RSVPs, attendance/check-ins, and member shortlists. Define role and chapter boundaries, validation, retention, and audit needs with research input.
 4. **Publish integration contracts.** Specify read/write operations and TypeScript shapes for PNM dashboard, event RSVP, member attendee list, invitation review, and check-in. Agree these with Miles before implementing UI-dependent endpoints.
-5. **Implement the next vertical slice.** Add new datasets only after their contracts and access rules are agreed. Keep a documented demo path for local UI work.
+5. **Implement the next vertical slice.** Continue adding datasets only after their contracts and access rules are agreed. Keep a documented demo path for local UI work.
 6. **Add identity and authorization.** Implement authentication and server-side role/chapter authorization before exposing real PNM or member data. Do not treat client-side visibility as access control.
 7. **Add operational flows.** Implement check-in token issuance/validation, invitation review, and any messaging integration only after workflow and abuse/privacy requirements are confirmed. Keep secrets server-side and make sensitive actions auditable.
 8. **Harden and hand off.** Document environment variables, migrations, local setup, error behavior, and deployment steps. Verify only when requested, and update this guide and `journal.md` with completed decisions and milestones.
@@ -46,13 +46,17 @@ The prototype now persists profiles in a local SQLite database. Events, messages
 ### Current Backend Status
 
 - Profile records are stored in `data/rush.sqlite`; photos are stored under `data/profile-photos`. Both are ignored by Git. Set `SQLITE_DB_PATH` to choose another database file.
-- The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, while other roles may optionally select recognized houses.
+- The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, Rush Chair and Active Member profiles require exactly one, and PNM profiles may select any number.
+- SQLite migration version 1 adds `chapters`, `rush_cycles`, `rush_stages`, `pnm_chapter_progress`, `pnm_progress_history`, `events`, and `event_signups`. The five exact stage values are `open invite`, `closed invite day 1`, `closed invite day 2`, `closed invite day 3`, and `bid night`.
+- PNM progress is keyed by rush cycle, chapter, and PNM. Saving a PNM chapter association or signing up for an open-invite event creates `open invite` progress without downgrading a later stage. Rush chair progress updates can stay at the current stage or advance one stage and are written to history with the actor.
+- Rush chairs can add PNM profiles to SQLite from the member workspace. The PNM directory and both event schedules load from SQLite; chapter events and event sign-ups persist across sessions. The active cycle defaults to `Fall 2026` and can be named with `RUSH_CYCLE_NAME`.
+- On first startup, the app seeds one demo open-invite event for each recognized chapter. Addresses in the demo seed are placeholders and should be replaced before presenting them as real venues.
 - `GET`, `POST`, and `PATCH /api/profile` read and write the current browser profile. The `rush_profile_id` HttpOnly cookie identifies a local prototype profile; it is not authentication or authorization.
 - The rush-chair funny-question prompt is configured in `lib/profile-domain.ts`. The profile stores the user's optional answer.
-- Existing Supabase client use remains for optional phone OTP, chapter reads, and the member PNM directory. Profile persistence and photos use SQLite/local disk instead of Supabase tables and Storage.
+- Existing Supabase client use remains for optional phone OTP. Chapter names, profile persistence, the member PNM directory, events, sign-ups, and progress use SQLite/local disk.
 - The Supabase browser client reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put service-role or secret keys in `NEXT_PUBLIC_*` variables or browser code.
 - SQLite files and photos require persistent writable disk. Do not rely on ephemeral serverless storage for durable profile data, and do not expose this prototype's profile API as production data without identity and authorization.
-- Next action: confirm the remaining recruitment workflow and privacy requirements before adding events, RSVPs, invitations, attendance, or messaging datasets.
+- Next action: add identity and authorization before using PNM, event, or progress records outside the local prototype. Confirm messaging and attendance requirements before persisting those workflows.
 
 ### Draft Relational Schema (For Discussion)
 
@@ -73,10 +77,11 @@ This is a discussion draft for a future auth-backed system, not the current SQLi
 
 - A PNM may interact with multiple chapters during one rush cycle; a chapter owns its events and invitations.
 - A user can have different roles in different chapter/cycle contexts; avoid a single global `role` field as the only authorization source.
-- `rush_registrations` stores cycle-specific PNM registration and phone consent. `pnm_chapter_progress` stores that PNM's current round with each chapter in the cycle, using `open_invite`, `closed_invite_d1`, `closed_invite_d2`, `closed_invite_d3`, or `bid_night`. Its `(rush_cycle_id, chapter_id, pnm_id)` uniqueness allows different progress per chapter. Round changes must be restricted to authorized chapter/rush chairs and recorded with the updating actor.
+- The current SQLite `pnm_chapter_progress` table stores the exact display stage values (`open invite`, `closed invite day 1`, `closed invite day 2`, `closed invite day 3`, `bid night`) with `(rush_cycle_id, chapter_name, pnm_id)` uniqueness. The draft hosted model may use normalized stage keys after the auth-backed schema is agreed.
+- `rush_registrations` stores cycle-specific PNM registration and phone consent in the future hosted model. Round changes must be restricted to authorized chapter/rush chairs and recorded with the updating actor.
 - `profiles` includes optional `hometown` and `major`. `rush_cycle_settings.funny_question_prompt` stores the cycle's rush-chair-configured optional question; `rush_registrations.funny_question_answer` stores each PNM's optional response.
 - Decide whether PNM profile identity is global across cycles or whether additional cycle-specific profile data belongs in `rush_registrations`.
-- Confirm whether RSVP and “add to my schedule” mean the same action. The current portal only stores selected event IDs in client state, and its copy distinguishes planning from attendance.
+- The current PNM portal treats "sign up" as a durable event signup and displays it in My schedule. Attendance remains a separate future check-in record.
 - Specify policies for phone/photo access, invitation privacy, shortlist visibility, data deletion/retention, consent, and attendance correction before enabling real data.
 
 ## Change Workflow

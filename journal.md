@@ -66,3 +66,10 @@ we'll update this journal every time we make a milestone or do something
 - Made the PNM directory searchable by name, major, hometown, class year, and interests, with clear and empty-result states.
 - Connected the member header logo to the PNM directory, labeled the profile control, and aligned the member profile with the PNM profile layout. Members can update major and hometown through the local profile API.
 - Confirmed profile onboarding requires name, phone number, and photo; chapter association and other details remain optional.
+
+## 2026-11-15 — SQLite chapter progress and event persistence
+- Added versioned SQLite schema for rush cycles, exact rush stages, chapter-specific PNM progress and history, chapter events, and event sign-ups.
+- PNM chapter associations and open-invite sign-ups now create open-invite progress without downgrading a later stage. Rush chairs can advance a PNM one stage at a time, with the actor and changes recorded in history.
+- Connected the PNM chapter directory, schedule, member PNM directory, and event calendar to SQLite. Rush chairs can create chapter events and add PNM profiles from the member workspace; those records reload across sessions.
+- Seeded one demo open-invite event per recognized chapter for pitch/demo setup and documented that the addresses are placeholders.
+- Added a profile-switch action that clears the browser cookie while keeping each saved SQLite profile, making multi-profile pitch demos possible on one device.

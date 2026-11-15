@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { applySqliteMigrations } from "@/lib/server/sqlite-migrations";
 
 declare global {
   // Keep one connection during Next.js development hot reloads.
@@ -41,7 +42,9 @@ function openDatabase() {
 
     CREATE INDEX IF NOT EXISTS profile_houses_house_name_idx
       ON profile_houses(house_name);
+
   `);
+  applySqliteMigrations(database);
 
   return database;
 }

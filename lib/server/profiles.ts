@@ -1,4 +1,5 @@
 import { getDatabase } from "@/lib/server/sqlite";
+import { ensureOpenInviteProgress } from "@/lib/server/rush";
 import type { ProfileRole } from "@/lib/profile-domain";
 
 export type ProfileRow = {
@@ -33,7 +34,7 @@ export function getProfileById(id: string): StoredProfile | null {
   return { ...row, associated_houses: houses.map((house) => house.house_name) };
 }
 
-export function saveProfile(input: ProfileInput): StoredProfile {
+export function saveProfile(input: ProfileInput, progressActorId: string | null = null): StoredProfile {
   const database = getDatabase();
   const now = new Date().toISOString();
   const { associated_houses, ...profileFields } = input;
@@ -61,7 +62,10 @@ export function saveProfile(input: ProfileInput): StoredProfile {
     const insertHouse = database.prepare(
       "INSERT INTO profile_houses (profile_id, house_name) VALUES (?, ?)",
     );
-    for (const house of associated_houses) insertHouse.run(input.id, house);
+    for (const house of associated_houses) {
+      insertHouse.run(input.id, house);
+      if (input.role === "PNM") ensureOpenInviteProgress(input.id, house, progressActorId, database);
+    }
   });
 
   save();
