@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:demo": "tsc -p scripts/tsconfig.json && node .seed-build/scripts/seed-demo.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

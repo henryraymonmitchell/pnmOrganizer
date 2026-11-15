@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { chapterNames } from "@/lib/chapters";
-import { RUSH_PROGRESS_STAGES } from "@/lib/rush-domain";
+import { chapterNames } from "../chapters";
+import { RUSH_PROGRESS_STAGES } from "../rush-domain";
 
 const RUSH_SCHEMA_VERSION = 1;
 

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { applySqliteMigrations } from "@/lib/server/sqlite-migrations";
+import { applySqliteMigrations } from "./sqlite-migrations";
 
 declare global {
   // Keep one connection during Next.js development hot reloads.

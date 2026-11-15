@@ -1,0 +1,222 @@
+[
+  {
+    "id": "ad4d9cf1-89ac-43f8-8e95-aea04cdd68ae",
+    "full_name": "Jennifer Knight",
+    "hometown": "San Diego, CA",
+    "major": "Computer Science",
+    "funny_question_answer": "I can solve a Rubik’s cube in under a minute.",
+    "phone": "+15550000001",
+    "photo": "demo-pnm-01.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "open invite"
+  },
+  {
+    "id": "3c75c7b3-4970-40a3-ac01-d5159f8149ad",
+    "full_name": "Crystal Allen",
+    "hometown": "Santa Maria, CA",
+    "major": "Business Administration",
+    "funny_question_answer": null,
+    "phone": "+15550000002",
+    "photo": "demo-pnm-02.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "closed invite day 1"
+  },
+  {
+    "id": "f4338ae8-126e-4bd9-afb0-91578a88827d",
+    "full_name": "Lorraine Robinson",
+    "hometown": "San Jose, CA",
+    "major": "Mechanical Engineering",
+    "funny_question_answer": "I have visited twelve national parks.",
+    "phone": "+15550000003",
+    "photo": "demo-pnm-03.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "closed invite day 2"
+  },
+  {
+    "id": "5f12dd03-4a70-48c9-8bf9-3d8ae384d137",
+    "full_name": "Francis Butler",
+    "hometown": "Los Angeles, CA",
+    "major": "Biology",
+    "funny_question_answer": null,
+    "phone": "+15550000004",
+    "photo": "demo-pnm-04.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "closed invite day 3"
+  },
+  {
+    "id": "1c6265ce-ade1-48e8-ba33-7b7f152849ea",
+    "full_name": "Dianne Evans",
+    "hometown": "San Francisco, CA",
+    "major": "Psychology",
+    "funny_question_answer": "I make fresh pasta from scratch.",
+    "phone": "+15550000005",
+    "photo": "demo-pnm-05.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "bid night"
+  },
+  {
+    "id": "2a0fa3e4-a6d7-40de-bc58-879d4dd792b5",
+    "full_name": "Allen Young",
+    "hometown": "Sacramento, CA",
+    "major": "Kinesiology",
+    "funny_question_answer": null,
+    "phone": "+15550000006",
+    "photo": "demo-pnm-06.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "closed invite day 1"
+  },
+  {
+    "id": "f3911342-0b58-411a-8eca-8b013d20502e",
+    "full_name": "Morris Wagner",
+    "hometown": "Fresno, CA",
+    "major": "Political Science",
+    "funny_question_answer": "I played violin for ten years.",
+    "phone": "+15550000007",
+    "photo": "demo-pnm-07.jpg",
+    "chapter_name": "Delta Upsilon",
+    "status": "open invite"
+  },
+  {
+    "id": "b8e0450e-3723-4517-9462-cabaf0b3d09f",
+    "full_name": "Bradley Arnold",
+    "hometown": "Irvine, CA",
+    "major": "Architecture",
+    "funny_question_answer": null,
+    "phone": "+15550000008",
+    "photo": "demo-pnm-08.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "closed invite day 2"
+  },
+  {
+    "id": "0c4d58b2-25d3-44d2-8f77-ab8a2becfba4",
+    "full_name": "Elaine Harvey",
+    "hometown": "Oakland, CA",
+    "major": "Agricultural Business",
+    "funny_question_answer": "I can name every country in South America.",
+    "phone": "+15550000009",
+    "photo": "demo-pnm-09.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "bid night"
+  },
+  {
+    "id": "db09c890-468e-441a-bb8f-316a68e504ca",
+    "full_name": "Armando Fleming",
+    "hometown": "Santa Barbara, CA",
+    "major": "Civil Engineering",
+    "funny_question_answer": null,
+    "phone": "+15550000010",
+    "photo": "demo-pnm-10.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "open invite"
+  },
+  {
+    "id": "a152ba2f-3ca3-407e-b81f-6bed5ed12665",
+    "full_name": "Andy Ferguson",
+    "hometown": "Bakersfield, CA",
+    "major": "Computer Science",
+    "funny_question_answer": "I once hiked 30 miles in a day.",
+    "phone": "+15550000011",
+    "photo": "demo-pnm-11.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "closed invite day 3"
+  },
+  {
+    "id": "7fd00877-d07b-49a4-9faa-667c14888126",
+    "full_name": "Paul Burke",
+    "hometown": "Davis, CA",
+    "major": "Business Administration",
+    "funny_question_answer": null,
+    "phone": "+15550000012",
+    "photo": "demo-pnm-12.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "closed invite day 1"
+  },
+  {
+    "id": "2b5de32f-cd7c-44e1-92d9-b7556611bf13",
+    "full_name": "Kim Daniels",
+    "hometown": "Santa Cruz, CA",
+    "major": "Mechanical Engineering",
+    "funny_question_answer": "I build small robots as a hobby.",
+    "phone": "+15550000013",
+    "photo": "demo-pnm-13.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "closed invite day 2"
+  },
+  {
+    "id": "bc1bbba2-23f7-44d9-8bd4-095ee121e047",
+    "full_name": "Louis Meyer",
+    "hometown": "Riverside, CA",
+    "major": "Biology",
+    "funny_question_answer": null,
+    "phone": "+15550000014",
+    "photo": "demo-pnm-14.jpg",
+    "chapter_name": "Kappa Sigma",
+    "status": "bid night"
+  },
+  {
+    "id": "8e41508c-74b2-41ff-8cbb-c6357b3abe4f",
+    "full_name": "Kaylee Morgan",
+    "hometown": "Modesto, CA",
+    "major": "Psychology",
+    "funny_question_answer": "I have a black belt in taekwondo.",
+    "phone": "+15550000015",
+    "photo": "demo-pnm-15.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "open invite"
+  },
+  {
+    "id": "49c1c99f-6920-4385-bdab-72a547e3a61e",
+    "full_name": "Kenneth Perry",
+    "hometown": "Berkeley, CA",
+    "major": "Kinesiology",
+    "funny_question_answer": null,
+    "phone": "+15550000016",
+    "photo": "demo-pnm-16.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "closed invite day 2"
+  },
+  {
+    "id": "dbb5580c-c1f1-4335-a98e-b4ed1e0f0f4c",
+    "full_name": "Todd Reyes",
+    "hometown": "Chula Vista, CA",
+    "major": "Political Science",
+    "funny_question_answer": "I collect vintage postcards.",
+    "phone": "+15550000017",
+    "photo": "demo-pnm-17.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "closed invite day 1"
+  },
+  {
+    "id": "204a9159-c3fa-4a91-ba1a-c14aca765ba7",
+    "full_name": "Terry Lawson",
+    "hometown": "Thousand Oaks, CA",
+    "major": "Architecture",
+    "funny_question_answer": null,
+    "phone": "+15550000018",
+    "photo": "demo-pnm-18.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "closed invite day 3"
+  },
+  {
+    "id": "5d1b698d-9569-444e-8ac6-c594b257f363",
+    "full_name": "Frederick Shelton",
+    "hometown": "Stockton, CA",
+    "major": "Agricultural Business",
+    "funny_question_answer": "I make a great sourdough loaf.",
+    "phone": "+15550000019",
+    "photo": "demo-pnm-19.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "open invite"
+  },
+  {
+    "id": "d512cdba-f991-4cf2-99c1-8f6ca626c913",
+    "full_name": "Barry Alexander",
+    "hometown": "Ventura, CA",
+    "major": "Civil Engineering",
+    "funny_question_answer": null,
+    "phone": "+15550000020",
+    "photo": "demo-pnm-20.jpg",
+    "chapter_name": "Sigma Phi Epsilon",
+    "status": "bid night"
+  }
+]
