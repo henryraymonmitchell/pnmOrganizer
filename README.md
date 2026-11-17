@@ -29,26 +29,28 @@ Rush chairs can add PNM profiles from the member workspace. Selecting a chapter 
 
 See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile, event, and progress API contracts.
 
-## Cal Poly email, phone verification, and messages
+## Cal Poly sign-in, phone verification, and messages
 
-New accounts use a passwordless confirmation flow: a six-digit email code is sent only to a valid `@calpoly.edu` mailbox, then the user confirms their phone by SMS before a profile can be saved. This verifies control of a Cal Poly email address; it is not Cal Poly single sign-on. Official SSO would require an approved Cal Poly identity-provider integration.
+New accounts sign in on the official Microsoft 365 page used for Cal Poly email and Outlook. The app uses Microsoft Entra OpenID Connect with authorization-code flow, PKCE, nonce validation, and verified ID-token checks; only a verified `@calpoly.edu` identity may continue. Passwords and MFA are handled by Microsoft, never by this app. Users then confirm their phone by SMS before a profile can be saved.
 
-The app intentionally has no development bypass for either confirmation. Configure these server-only variables locally or in Railway before inviting real users:
+This requires a Cal Poly Microsoft Entra app registration. An authorized Cal Poly administrator must register the production callback URL, allow the app in the Cal Poly tenant, and provide a client ID and secret. Configure these server-only variables locally or in Railway before inviting real users:
 
 ```bash
-RESEND_API_KEY=...
-AUTH_EMAIL_FROM="Rush <no-reply@your-verified-domain.example>"
+MICROSOFT_CLIENT_ID=...
+MICROSOFT_CLIENT_SECRET=...
+MICROSOFT_TENANT_ID=<Cal-Poly-tenant-ID-or-domain>
+AUTH_APP_URL=https://rush-hub-production.up.railway.app
 AUTH_CODE_SECRET=long-random-secret
 TWILIO_ACCOUNT_SID=...
 TWILIO_AUTH_TOKEN=...
 TWILIO_VERIFY_SERVICE_SID=...
 ```
 
-1. In Resend, verify the sender domain used by `AUTH_EMAIL_FROM` and create an API key that can send email.
+1. In Microsoft Entra, use the Web redirect URI `https://rush-hub-production.up.railway.app/api/auth/microsoft/callback` (and your localhost callback for development). Restrict the app to the Cal Poly tenant when campus IT provides its tenant ID; using `organizations` is a temporary work/school-account fallback, while the app still enforces `@calpoly.edu`.
 2. In Twilio, create a Verify service and use its service SID. Complete any required SMS sender, consent, and compliance setup before messaging real people.
 3. Add the values in your host's secret/variable settings, then redeploy. Never use `NEXT_PUBLIC_*` for these variables.
 
-Without these values, the app returns a clear setup error instead of falsely marking an email or phone as confirmed. `chapter_messages` is stored in SQLite and powers the PNM/chair chat screens; clients poll the secured message API for new messages, so chats survive refreshes and navigation.
+Without these values, the app returns a clear setup error instead of falsely marking an identity or phone as confirmed. `chapter_messages` is stored in SQLite and powers the PNM/chair chat screens; clients poll the secured message API for new messages, so chats survive refreshes and navigation.
 
 ## Deploy
 

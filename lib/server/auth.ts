@@ -11,7 +11,7 @@ const EMAIL_RESEND_DELAY_MS = 60 * 1000;
 const MAX_EMAIL_CODE_ATTEMPTS = 5;
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
-type AuthSessionRow = {
+export type AuthSessionRow = {
   id: string;
   token_hash: string;
   email: string;
@@ -48,8 +48,12 @@ function requiredEnv(name: string) {
 }
 
 function hash(value: string) {
-  const secret = requiredEnv("AUTH_CODE_SECRET");
+  const secret = getAuthCodeSecret();
   return createHash("sha256").update(`${secret}:${value}`).digest("hex");
+}
+
+export function getAuthCodeSecret() {
+  return requiredEnv("AUTH_CODE_SECRET");
 }
 
 function tokenHash(token: string) {
@@ -182,28 +186,37 @@ export function verifyEmailVerification(email: string, code: unknown) {
     throw new AuthError("That confirmation code is not correct.");
   }
 
+  const createdAt = new Date().toISOString();
+  database.prepare("UPDATE auth_email_challenges SET consumed_at = ? WHERE id = ?").run(createdAt, challenge.id);
+  return createVerifiedEmailSession(email);
+}
+
+/** Creates an app session after an identity provider has verified the Cal Poly mailbox. */
+export function createVerifiedEmailSession(email: string) {
+  const database = getDatabase();
   const token = randomBytes(32).toString("base64url");
   const sessionId = randomUUID();
   const createdAt = new Date().toISOString();
-  const existingProfile = database.prepare("SELECT id FROM profiles WHERE email = ?").get(email) as { id: string } | undefined;
-  database.transaction(() => {
-    database.prepare("UPDATE auth_email_challenges SET consumed_at = ? WHERE id = ?").run(createdAt, challenge.id);
-    database.prepare(`
-      INSERT INTO auth_sessions (
-        id, token_hash, email, email_verified_at, phone, phone_verified_at, profile_id, expires_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
-    `).run(
-      sessionId,
-      tokenHash(token),
-      email,
-      createdAt,
+  const existingProfile = database.prepare(`
+    SELECT id, phone, phone_verified_at FROM profiles WHERE email = ?
+  `).get(email) as { id: string; phone: string; phone_verified_at: string | null } | undefined;
+  const verifiedPhone = existingProfile?.phone_verified_at ? existingProfile.phone : null;
+  database.prepare(`
+    INSERT INTO auth_sessions (
+      id, token_hash, email, email_verified_at, phone, phone_verified_at, profile_id, expires_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    sessionId,
+    tokenHash(token),
+    email,
+    createdAt,
+      verifiedPhone,
+      verifiedPhone ? existingProfile?.phone_verified_at : null,
       existingProfile?.id ?? null,
-      new Date(Date.now() + SESSION_TTL_MS).toISOString(),
-      createdAt,
-      createdAt,
-    );
-  })();
-
+    new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+    createdAt,
+    createdAt,
+  );
   const session = database.prepare("SELECT * FROM auth_sessions WHERE id = ?").get(sessionId) as AuthSessionRow;
   return { token, session };
 }

@@ -116,3 +116,8 @@ we'll update this journal every time we make a milestone or do something
 - Bound authenticated sessions to profiles and updated the PNM/member portals to require a verified identity, while preserving legacy local records only for migration compatibility.
 - Replaced client-only PNM/rush-chair chat with role- and chapter-scoped SQLite message APIs plus polling clients that persist conversations across refreshes and navigation.
 - Added deployment documentation and a safe `.env.example` for the required server-only provider credentials. Live email/SMS delivery still requires Resend and Twilio values to be configured by an administrator.
+
+## 2026-11-16 — Cal Poly Microsoft 365 sign-in
+- Replaced the account-gateway email-code UI with a redirect to the official Microsoft 365 sign-in page used for Cal Poly Outlook accounts.
+- Added Microsoft Entra authorization-code + PKCE callback handling with signed state, nonce, ID-token signature/issuer/audience validation, and a strict `@calpoly.edu` identity check before creating the existing hashed app session.
+- Documented the required Cal Poly Entra app registration, production callback, and server-only Railway variables. Phone verification and persistent SQLite chapter chat remain unchanged.
