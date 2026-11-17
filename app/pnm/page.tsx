@@ -1,8 +1,8 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import { isAuthSessionDto } from "@/lib/auth-domain";
 import { chapters as fallbackChapters, type Chapter } from "@/lib/chapters";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { isProfileDto } from "@/lib/profile-domain";
 import { isRushEventList, type RushEventDto } from "@/lib/rush-domain";
 
@@ -21,6 +21,10 @@ function eventTime(event: RushEventDto) {
 
 function eventTitle(event: RushEventDto) {
   return event.event_type.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function apiError(value: unknown, fallback: string) {
+  return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : fallback;
 }
 
 export default function PnmPortal() {
@@ -45,11 +49,23 @@ export default function PnmPortal() {
     const isSwitching = new URLSearchParams(window.location.search).get("switch") === "1";
     async function restoreProfile() {
       try {
-        const response = await fetch("/api/profile", { cache: "no-store" });
+        const [sessionResponse, response] = await Promise.all([
+          fetch("/api/auth/session", { cache: "no-store" }),
+          fetch("/api/profile", { cache: "no-store" }),
+        ]);
+        const session: unknown = sessionResponse.ok ? await sessionResponse.json() : null;
+        if (!isAuthSessionDto(session) || !session.email_verified) {
+          window.location.replace("/");
+          return;
+        }
         if (response.ok) {
           const value: unknown = await response.json();
           if (!isProfileDto(value)) return;
           const data = value;
+          if (data.role !== "PNM" && !isSwitching) {
+            window.location.replace(data.role === "Rush Chair" ? "/member?chair=yes" : data.role === "IFC Admin" ? "/member?role=IFC%20Admin" : "/member?chair=no");
+            return;
+          }
           if (active && (data.role === "PNM" || isSwitching)) {
             setProfile({
               name: data.full_name,
@@ -60,7 +76,7 @@ export default function PnmPortal() {
               associatedHouses: data.associated_houses,
               funnyQuestionAnswer: data.funny_question_answer ?? "",
             });
-            if (data.role === "PNM") setIsReady(true);
+            if (data.role === "PNM" && data.email_verified_at && data.phone_verified_at) setIsReady(true);
           }
         }
       } catch {
@@ -254,7 +270,6 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const demoMode = !isSupabaseConfigured;
   const updatePhoto = (event: ChangeEvent<HTMLInputElement>) => { const photoFile = event.target.files?.[0]; if (photoFile) setProfile({ ...profile, photoFile, photo: URL.createObjectURL(photoFile) }); };
   const canContinue = step === 0
     ? profile.name.trim().length > 1
@@ -265,15 +280,23 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
     setLocalError(null);
     setBusy(true);
     try {
-      if (step === 1 && demoMode) {
-        setStep(2);
-      } else if (step === 1 && !codeSent) {
-        const { error: sendError } = await supabase.auth.signInWithOtp({ phone: profile.phone.trim() });
-        if (sendError) throw sendError;
+      if (step === 1 && !codeSent) {
+        const response = await fetch("/api/auth/phone/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: profile.phone.trim() }),
+        });
+        const result: unknown = await response.json();
+        if (!response.ok) throw new Error(apiError(result, "Could not send a phone confirmation code."));
         setCodeSent(true);
       } else if (step === 1) {
-        const { error: verifyError } = await supabase.auth.verifyOtp({ phone: profile.phone.trim(), token: code, type: "sms" });
-        if (verifyError) throw verifyError;
+        const response = await fetch("/api/auth/phone/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: profile.phone.trim(), code }),
+        });
+        const result: unknown = await response.json();
+        if (!response.ok) throw new Error(apiError(result, "Could not verify that phone code."));
         setStep(2);
       } else if (step === 2) {
         setStep(3);
@@ -290,7 +313,7 @@ function Onboarding({ profile, setProfile, step, setStep, complete, error }: { p
   };
   return <main className="cal-poly-app onboarding"><section className="onboarding-top"><img src="/brand/cal-poly-ifc.png" alt="Cal Poly IFC" /><span>FALL RUSH ’26</span></section><section className="onboarding-body"><div className="step-indicator"><b className={step >= 0 ? "done" : ""}></b><b className={step >= 1 ? "done" : ""}></b><b className={step >= 2 ? "done" : ""}></b><b className={step >= 3 ? "done" : ""}></b></div>
     {step === 0 && <><p className="eyebrow">STEP 1 OF 4</p><h1>What should we<br />call you?</h1><p>Start with your name so every chapter can welcome you personally.</p><label>Your full name<input autoFocus value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} placeholder="e.g. Maya Rodriguez" /></label></>}
-    {step === 1 && <><p className="eyebrow">STEP 2 OF 4</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>{demoMode ? "Demo mode: text verification is not configured, so you can continue without a code." : "By continuing, you agree to receive IFC rush texts. You can opt out anytime."}</small></>}
+    {step === 1 && <><p className="eyebrow">STEP 2 OF 4</p><h1>{codeSent ? "Verify your\nphone number." : "Your phone\nnumber."}</h1><p>{codeSent ? `Enter the code sent to ${profile.phone}.` : "Use international format, for example +18055550123."}</p><label>Mobile number<input autoFocus inputMode="tel" value={profile.phone} disabled={codeSent} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} placeholder="+18055550123" /></label>{codeSent && <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label>}<small>By continuing, you agree to receive IFC rush texts. You can opt out anytime.</small></>}
     {step === 2 && <><p className="eyebrow">STEP 3 OF 4</p><h1>A little more<br />about you.</h1><label>Hometown <span>(optional)</span><input value={profile.hometown} onChange={(event) => setProfile({ ...profile, hometown: event.target.value })} placeholder="e.g. San Francisco" /></label><label>Major <span>(optional)</span><input value={profile.major} onChange={(event) => setProfile({ ...profile, major: event.target.value })} placeholder="e.g. Computer Science" /></label></>}
     {step === 3 && <><p className="eyebrow">STEP 4 OF 4</p><h1>Add a clear<br />photo of you.</h1><p>It helps chapters recognize you at their front booth—so check-in stays quick.</p><label className="photo-upload">{profile.photo ? <img src={profile.photo} alt="Profile preview" /> : <span>＋</span>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={updatePhoto} /><b>{profile.photo ? "Change photo" : "Choose a photo"}</b></label></>}
     {(localError || error) && <p role="alert">{localError || error}</p>}<button className="onboarding-next" disabled={!canContinue || busy} onClick={continueOnboarding}>{busy ? "Please wait…" : step === 3 ? "Save profile →" : step === 1 && codeSent ? "Verify code →" : "Continue →"}</button>

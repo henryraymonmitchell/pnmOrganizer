@@ -109,3 +109,10 @@ we'll update this journal every time we make a milestone or do something
 - Upgraded Next.js to the current patched release required by the hosting security checks, retaining a pinned version for reproducible Docker builds.
 - Updated dynamic route handler parameter access and the SQLite server-package configuration for Next.js 16.
 - Confirmed the clean production build serves the PNM page and database-backed API routes locally.
+
+## 2026-11-16 — Verified identity and persistent chapter chat
+- Added SQLite migrations for Cal Poly email verification challenges, hashed HttpOnly sign-in sessions, verified phone records, and persisted chapter message threads.
+- Replaced mock email and phone steps with provider-backed flows: six-digit `@calpoly.edu` email codes via Resend and SMS verification via Twilio Verify. New profiles can only be saved after both checks complete.
+- Bound authenticated sessions to profiles and updated the PNM/member portals to require a verified identity, while preserving legacy local records only for migration compatibility.
+- Replaced client-only PNM/rush-chair chat with role- and chapter-scoped SQLite message APIs plus polling clients that persist conversations across refreshes and navigation.
+- Added deployment documentation and a safe `.env.example` for the required server-only provider credentials. Live email/SMS delivery still requires Resend and Twilio values to be configured by an administrator.

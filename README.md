@@ -29,6 +29,27 @@ Rush chairs can add PNM profiles from the member workspace. Selecting a chapter 
 
 See [`docs/profile-contract.md`](docs/profile-contract.md) for the profile, event, and progress API contracts.
 
+## Cal Poly email, phone verification, and messages
+
+New accounts use a passwordless confirmation flow: a six-digit email code is sent only to a valid `@calpoly.edu` mailbox, then the user confirms their phone by SMS before a profile can be saved. This verifies control of a Cal Poly email address; it is not Cal Poly single sign-on. Official SSO would require an approved Cal Poly identity-provider integration.
+
+The app intentionally has no development bypass for either confirmation. Configure these server-only variables locally or in Railway before inviting real users:
+
+```bash
+RESEND_API_KEY=...
+AUTH_EMAIL_FROM="Rush <no-reply@your-verified-domain.example>"
+AUTH_CODE_SECRET=long-random-secret
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_VERIFY_SERVICE_SID=...
+```
+
+1. In Resend, verify the sender domain used by `AUTH_EMAIL_FROM` and create an API key that can send email.
+2. In Twilio, create a Verify service and use its service SID. Complete any required SMS sender, consent, and compliance setup before messaging real people.
+3. Add the values in your host's secret/variable settings, then redeploy. Never use `NEXT_PUBLIC_*` for these variables.
+
+Without these values, the app returns a clear setup error instead of falsely marking an email or phone as confirmed. `chapter_messages` is stored in SQLite and powers the PNM/chair chat screens; clients poll the secured message API for new messages, so chats survive refreshes and navigation.
+
 ## Deploy
 
 Use a host that provides a persistent writable volume for the SQLite database and profile photos. The included `Dockerfile` and `railway.toml` are ready for Railway or another Docker host:
@@ -46,4 +67,4 @@ Do not deploy this SQLite version to an ephemeral serverless filesystem: profile
 npm run build
 ```
 
-The app is a prototype. SQLite persistence is local to the host. The profile cookie is a demo identity token, and production authentication/authorization, photo storage, check-in validation, and messaging delivery remain future integration work.
+The app uses provider-backed email and phone verification for new profiles when the variables above are configured. SQLite persistence is local to the host, and durable production use still depends on a protected persistent volume, appropriate privacy/retention practices, approved messaging consent, secure photo storage, and completed check-in validation.

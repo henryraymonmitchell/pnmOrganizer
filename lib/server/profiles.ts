@@ -6,10 +6,13 @@ export type ProfileRow = {
   id: string;
   role: ProfileRole;
   full_name: string;
+  email: string | null;
+  email_verified_at: string | null;
   hometown: string | null;
   major: string | null;
   funny_question_answer: string | null;
   phone: string;
+  phone_verified_at: string | null;
   photo_path: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +35,12 @@ export function getProfileById(id: string): StoredProfile | null {
     .all(id) as { house_name: string }[];
 
   return { ...row, associated_houses: houses.map((house) => house.house_name) };
+}
+
+export function getProfileByEmail(email: string): StoredProfile | null {
+  const database = getDatabase();
+  const row = database.prepare("SELECT id FROM profiles WHERE email = ?").get(email) as { id: string } | undefined;
+  return row ? getProfileById(row.id) : null;
 }
 
 export type PnmDirectoryProfile = Pick<ProfileRow, "id" | "full_name" | "hometown" | "major" | "photo_path">;
@@ -60,19 +69,22 @@ export function saveProfile(input: ProfileInput, progressActorId: string | null 
   const save = database.transaction(() => {
     database.prepare(`
       INSERT INTO profiles (
-        id, role, full_name, hometown, major, funny_question_answer,
-        phone, photo_path, created_at, updated_at
+        id, role, full_name, email, email_verified_at, hometown, major, funny_question_answer,
+        phone, phone_verified_at, photo_path, created_at, updated_at
       ) VALUES (
-        @id, @role, @full_name, @hometown, @major, @funny_question_answer,
-        @phone, @photo_path, @created_at, @updated_at
+        @id, @role, @full_name, @email, @email_verified_at, @hometown, @major, @funny_question_answer,
+        @phone, @phone_verified_at, @photo_path, @created_at, @updated_at
       )
       ON CONFLICT(id) DO UPDATE SET
         role = excluded.role,
         full_name = excluded.full_name,
+        email = excluded.email,
+        email_verified_at = excluded.email_verified_at,
         hometown = excluded.hometown,
         major = excluded.major,
         funny_question_answer = excluded.funny_question_answer,
         phone = excluded.phone,
+        phone_verified_at = excluded.phone_verified_at,
         photo_path = excluded.photo_path,
         updated_at = excluded.updated_at
     `).run({ ...profileFields, updated_at: now, created_at: input.created_at ?? now });

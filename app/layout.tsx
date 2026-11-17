@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./identity-chat.css";
 
 export const metadata: Metadata = {
   title: "Rush — Your IFC guide",

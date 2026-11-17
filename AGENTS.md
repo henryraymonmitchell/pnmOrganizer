@@ -4,7 +4,7 @@
 
 - Rush is a mobile-first IFC recruitment hub prototype built with Next.js 14, React 18, and TypeScript.
 - It currently has two product areas: the PNM portal at `/pnm` and the active-member workspace at `/member`. The root route redirects to `/pnm`.
-- The current product is a UI prototype with local SQLite profile persistence. Treat real authentication/authorization, production storage, QR validation, and message delivery as future integration work unless the task explicitly asks for them.
+- The current product uses local SQLite for profiles, event data, verification sessions, and chapter chat. New profile creation requires provider-backed Cal Poly email and SMS confirmation when the server secrets are configured; production storage, QR validation, and broader authorization hardening still need operational review.
 
 ## Development
 
@@ -32,7 +32,7 @@
 
 ## Henry's Backend Work Plan
 
-The prototype persists profiles, chapter progress, events, and event sign-ups in a local SQLite database. Messages and other recruitment workflows remain mock/client state. Continue in this order, updating status here as decisions are made and tasks are completed:
+The prototype persists profiles, chapter progress, events, event sign-ups, verification records, and private chapter messages in a local SQLite database. Invitation delivery, notification delivery, and attendance workflows still remain mock/client state. Continue in this order, updating status here as decisions are made and tasks are completed:
 
 1. **Confirm requirements and constraints.** Use Dean's research to define the rush lifecycle, entities, user types, privacy/consent needs, and who can see or change each record. Record open questions instead of baking guesses into the schema.
 2. **Maintain the SQLite store.** Keep persistence server-side, keep the database file out of Git, and record schema changes in versioned migrations under `lib/server/sqlite-migrations.ts`.
@@ -47,17 +47,17 @@ The prototype persists profiles, chapter progress, events, and event sign-ups in
 
 - Profile records are stored in `data/rush.sqlite`; photos are stored under `data/profile-photos`. Both are ignored by Git. Set `SQLITE_DB_PATH` to choose another database file.
 - The SQLite profile schema stores UUID, role, full name, hometown, major, optional funny-question answer, phone, photo path, and ISO timestamps. House associations are normalized into `profile_houses`; IFC Admin profiles receive every recognized house, Rush Chair and Active Member profiles require exactly one, and PNM profiles may select any number.
-- SQLite migration version 1 adds `chapters`, `rush_cycles`, `rush_stages`, `pnm_chapter_progress`, `pnm_progress_history`, `events`, and `event_signups`. The five exact stage values are `open invite`, `closed invite day 1`, `closed invite day 2`, `closed invite day 3`, and `bid night`.
+- SQLite migration version 1 adds `chapters`, `rush_cycles`, `rush_stages`, `pnm_chapter_progress`, `pnm_progress_history`, `events`, and `event_signups`. Migration 2 adds verified email/phone profile fields plus passwordless email challenges and hashed browser sessions; migration 3 adds persisted chapter message threads. The five exact stage values are `open invite`, `closed invite day 1`, `closed invite day 2`, `closed invite day 3`, and `bid night`.
 - PNM progress is keyed by rush cycle, chapter, and PNM. Saving a PNM chapter association or signing up for an open-invite event creates `open invite` progress without downgrading a later stage. Rush chair progress updates can stay at the current stage or advance one stage and are written to history with the actor.
 - Rush chairs can add PNM profiles to SQLite from the member workspace. The PNM directory and both event schedules load from SQLite; chapter events and event sign-ups persist across sessions. The active cycle defaults to `Fall 2026` and can be named with `RUSH_CYCLE_NAME`.
 - The active rush cycle receives two future Delta Upsilon open-invite demo events if it has none; their address is explicitly labeled as a demo location. Rush chairs create events for other chapters from the member calendar. The current local database has 20 fictional PNM demo records across Delta Upsilon, Kappa Sigma, and Sigma Phi Epsilon. Runtime databases and photo copies are gitignored in `data/`; tracked source fixtures are in `demo-data/`.
 - Recreate the tracked demo profiles, stage history, portraits, and open-invite schedule after cloning with `npm run seed:demo`; this preserves existing non-demo data and progress. The source fixture is in `demo-data/` and the TypeScript seed utility is in `scripts/`.
-- `GET`, `POST`, and `PATCH /api/profile` read and write the current browser profile. The `rush_profile_id` HttpOnly cookie identifies a local prototype profile; it is not authentication or authorization.
+- `GET`, `POST`, and `PATCH /api/profile` read and write the current browser profile. New writes require an HttpOnly hashed session created by `POST /api/auth/email/verify` plus a Twilio-verified phone; the legacy `rush_profile_id` cookie remains only as a migration-compatible fallback for existing local demo records.
 - The rush-chair funny-question prompt is configured in `lib/profile-domain.ts`. The profile stores the user's optional answer.
-- Existing Supabase client use remains for optional phone OTP. Chapter names, profile persistence, the member PNM directory, events, sign-ups, and progress use SQLite/local disk.
-- The Supabase browser client reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put service-role or secret keys in `NEXT_PUBLIC_*` variables or browser code.
+- Verification uses Resend for `@calpoly.edu` email codes and Twilio Verify for SMS codes; configuration is server-only through `RESEND_API_KEY`, `AUTH_EMAIL_FROM`, `AUTH_CODE_SECRET`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID`. Never put provider secrets in `NEXT_PUBLIC_*` variables or browser code.
+- `GET` and `POST /api/messages` persist PNM/rush-chair chapter threads in SQLite and enforce the requesting profile's role and associated chapter. The user interface polls the API for new messages.
 - SQLite files and photos require persistent writable disk. Do not rely on ephemeral serverless storage for durable profile data, and do not expose this prototype's profile API as production data without identity and authorization.
-- Next action: add identity and authorization before using PNM, event, or progress records outside the local prototype. Confirm messaging and attendance requirements before persisting those workflows.
+- Next action: configure the verification providers and deployment secrets, then review privacy/retention, message moderation, invite delivery, and attendance requirements before broader production use.
 
 ### Draft Relational Schema (For Discussion)
 

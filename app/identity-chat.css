@@ -1,0 +1,15 @@
+/* Verified identity and persisted chat states */
+.text-button{display:block;margin:14px auto 0;color:var(--cp-green);font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.onboarding .text-button{color:#f4cf79}
+.secondary-action{width:100%;padding:11px;border:1px solid #4a9b83;border-radius:9px;background:#123c33;color:#f7fffb;font-size:11px;font-weight:700}
+.secondary-action:disabled{opacity:.58;cursor:not-allowed}
+.verification-status{margin:-4px 0 1px;color:#8fe1bb!important;font-size:11px!important;font-weight:700}
+.chat-empty{margin:13px 0 0;color:#6a786f;font-size:11px;line-height:1.4}
+.chat-error{margin:10px 0 0;color:#9e3d35;font-size:11px;line-height:1.4}
+.chair-conversation-list{margin-top:17px}
+.chair-conversation-list button.selected{outline:2px solid var(--cp-brass);outline-offset:1px}
+.chair-conversation-list button>img,.conversation header>img{width:34px;height:34px;flex:0 0 34px;border-radius:50%;object-fit:cover}
+.chair-conversation-list button>b{display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--cp-gold);color:var(--cp-green-deep);font:700 9px 'DM Mono',monospace}
+.chair-thread{min-height:38px}
+.conversation .chat-empty{padding:2px 0}
+.reply-box button:disabled,.chat-composer button:disabled{opacity:.55;cursor:not-allowed}

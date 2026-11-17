@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { getProfileById } from "@/lib/server/profiles";
+import { getRequestProfile } from "@/lib/server/request-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,12 +10,7 @@ const PHOTO_DIRECTORY = resolve("data/profile-photos");
 
 export async function GET(request: NextRequest) {
   try {
-    const id = request.cookies.get("rush_profile_id")?.value;
-    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-      return NextResponse.json({ error: "Photo not found." }, { status: 404 });
-    }
-
-    const profile = getProfileById(id);
+    const profile = getRequestProfile(request);
     if (!profile?.photo_path) return NextResponse.json({ error: "Photo not found." }, { status: 404 });
 
     const filePath = resolve(profile.photo_path);

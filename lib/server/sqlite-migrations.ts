@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { chapterNames } from "../chapters";
 import { RUSH_PROGRESS_STAGES } from "../rush-domain";
 
-const RUSH_SCHEMA_VERSION = 1;
+const RUSH_SCHEMA_VERSION = 3;
 
 export function applySqliteMigrations(database: Database.Database) {
   const currentVersion = database.pragma("user_version", { simple: true }) as number;
@@ -87,6 +87,72 @@ export function applySqliteMigrations(database: Database.Database) {
       database.pragma(`user_version = ${RUSH_SCHEMA_VERSION}`);
     });
     migrateRushTables();
+  }
+
+  if (currentVersion < 2) {
+    const migrateIdentity = database.transaction(() => {
+      database.exec(`
+        ALTER TABLE profiles ADD COLUMN email TEXT;
+        ALTER TABLE profiles ADD COLUMN email_verified_at TEXT;
+        ALTER TABLE profiles ADD COLUMN phone_verified_at TEXT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS profiles_email_unique_idx
+          ON profiles(email) WHERE email IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS auth_email_challenges (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          code_hash TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          expires_at TEXT NOT NULL,
+          consumed_at TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS auth_email_challenges_email_created_idx
+          ON auth_email_challenges(email, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+          id TEXT PRIMARY KEY,
+          token_hash TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL,
+          email_verified_at TEXT NOT NULL,
+          phone TEXT,
+          phone_verified_at TEXT,
+          profile_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS auth_sessions_profile_idx
+          ON auth_sessions(profile_id);
+        CREATE INDEX IF NOT EXISTS auth_sessions_expiry_idx
+          ON auth_sessions(expires_at);
+      `);
+      database.pragma("user_version = 2");
+    });
+    migrateIdentity();
+  }
+
+  if (currentVersion < 3) {
+    const migrateMessages = database.transaction(() => {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS chapter_messages (
+          id TEXT PRIMARY KEY,
+          chapter_name TEXT NOT NULL REFERENCES chapters(name),
+          pnm_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          sender_profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          body TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          read_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS chapter_messages_thread_idx
+          ON chapter_messages(chapter_name, pnm_id, created_at);
+        CREATE INDEX IF NOT EXISTS chapter_messages_unread_idx
+          ON chapter_messages(chapter_name, pnm_id, read_at);
+      `);
+      database.pragma("user_version = 3");
+    });
+    migrateMessages();
   }
 
   seedActiveCycle(database);

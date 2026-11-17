@@ -98,10 +98,13 @@ export async function POST(request: NextRequest) {
       id: randomUUID(),
       role: "PNM",
       full_name: fullName,
+      email: null,
+      email_verified_at: null,
       hometown: hometown || null,
       major: major || null,
       funny_question_answer: null,
       phone,
+      phone_verified_at: null,
       photo_path: null,
       associated_houses: [chapterName],
     }, chair.id);
